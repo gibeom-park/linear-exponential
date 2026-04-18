@@ -94,21 +94,29 @@ pnpm dev
 
 ## Phase 3 — 훈련 모드 MVP
 
-**상태: ⏳ Phase 2 완료 후**
+**상태: 🚧 거의 완료 — 로컬 E2E 시연 + 모바일 실기기 PWA 설치 검증만 남음 (사용자 수동)**
+
+> Phase 2 의 결정 (calendar nav / 체크인 선택 / ±10% 경고만 / 같은 날 재진입 허용) 을 그대로 반영. 백엔드 PR A (#5) → 프론트엔드 PR B (#6) → 오프라인 + PWA PR C 순으로 분리.
 
 ### Done definition
-- [ ] 사전 체크인 화면: 수면(0.5h 단위 슬라이더) / 컨디션(1~5) / 체중 → `POST /api/train/checkin`
-- [ ] 오늘 시트 자동 표시: 활성 블럭의 오늘 day 매핑 → 운동 + 세트 카드 노출
-- [ ] 세트별 입력: RPE 필수, 무게는 ±10% 가드 (가드 외 시도 시 "코치에게 다시 물어보기" 버튼 노출 — Phase 4 에서 연결)
-- [ ] 세션 완료 → `POST /api/train/session-log` (training_logs 일괄 적재, weight_planned + weight_actual 둘 다)
-- [ ] IndexedDB 오프라인 큐 (`idb` 라이브러리): 오프라인 시 outbox 에 저장
-- [ ] 온라인 복귀 시 자동 flush + LWW 적용
-- [ ] Service Worker (`vite-plugin-pwa`): 앱 셸 cache-first / API network-first / 운동·블럭 메타 SWR
-- [ ] PWA manifest + 모바일 viewport 최적화 (헬스장 환경)
+- [x] 백엔드: `GET /api/train/day?date=...` (활성 블럭 + plan + logs + 휴식일 hint), `GET/POST /api/train/checkin` (user×date upsert), `POST /api/train/sets` ((program_set_id, date) upsert + D1 100-var 청크)
+- [x] 프론트: `/train` 페이지 — shadcn Calendar nav (휴식일이면 hint.prev/next 점프), CheckinForm (선택, 카드형), SessionSheet (운동별 그룹 + reps/무게/RPE 입력 + ±10% amber 경고)
+- [x] 같은 날 재진입: logs 가 prefill → 다시 저장 시 update (`bodyweight 다음 날 운동` 케이스 대응)
+- [x] IndexedDB outbox (`idb`): 오프라인 / 네트워크 실패 시 enqueue, LWW (같은 dedupeKey 는 최신만)
+- [x] 온라인 복귀 시 자동 flush — `online` 이벤트 + 페이지 진입 시 1회 시도 + react-query 캐시 무효화로 즉시 반영
+- [x] Service Worker (`vite-plugin-pwa`): 앱 셸 precache, API NetworkFirst (5s timeout), 카탈로그 SWR
+- [x] PWA manifest + viewport: SVG 아이콘 (any+maskable), apple-touch-icon, viewport-fit=cover, portrait 강제, status-bar-style black-translucent
+- [ ] 로컬 E2E 시연: `pnpm dev` + Chrome DevTools Network throttling=Offline → 세트 입력 → 큐 적재 확인 → Online → flush → D1 반영 확인 (**사용자 시연**)
+- [ ] iOS Safari / Android Chrome 실기기 PWA 설치 후 오프라인 동작 시연 (**사용자 시연**)
 
 ### Verification
-- Playwright 모바일 viewport: 체크인 → 세션 시작 → 오프라인 전환 → 세트 3개 기록 → 온라인 복귀 → D1 에 반영 확인
-- iOS Safari / Android Chrome 에서 PWA 설치 후 오프라인 동작 시연
+- 단위: `pnpm --filter @linex/frontend test` (outbox 8케이스: enqueue / LWW / flush 200/4xx/5xx/network-error / 부분 성공)
+- 수동 (Playwright 자동화 가능):
+  ```
+  pnpm dev → /train 진입 → 체크인 입력 → DevTools Offline → 세트 입력 → "대기 1건" 표시
+  → DevTools Online → "지금 보내기" 클릭 또는 자동 flush → "대기 0건"
+  → 새로고침 후 logs 유지 확인
+  ```
 
 ---
 
