@@ -22,9 +22,9 @@ import {
 } from '@linex/shared/validators/api/train';
 
 import { type Db, createDb } from '../lib/db.ts';
+import { requireUser } from '../middleware/auth.ts';
 import type { AppBindings } from '../types.ts';
 
-const USER_ID = 1;
 const LOGS_INSERT_CHUNK = 8; // training_logs 10 컬럼 → 8 row × 10 = 80 < 100
 
 // JS Date.getUTCDay(): 0=Sun, 1=Mon, ..., 6=Sat
@@ -89,11 +89,11 @@ export function nearbyPlannedDates(
   return { prev: find(-1), next: find(1) };
 }
 
-async function loadActiveBlock(db: Db) {
+async function loadActiveBlock(db: Db, userId: number) {
   const block = await db
     .select()
     .from(programBlocks)
-    .where(and(eq(programBlocks.userId, USER_ID), eq(programBlocks.isActive, true)))
+    .where(and(eq(programBlocks.userId, userId), eq(programBlocks.isActive, true)))
     .get();
   if (!block) return null;
   let selectedDays: DayOfWeek[];
@@ -109,12 +109,14 @@ async function loadActiveBlock(db: Db) {
 }
 
 export const trainRoute = new Hono<AppBindings>()
+  .use('*', requireUser)
   // 캘린더 selected date 의 plan + logs. 휴식일/블럭 외면 인접 훈련일 hint 반환.
   .get('/day', zValidator('query', trainDateQuerySchema), async (c) => {
+    const userId = c.get('userId');
     const { date } = c.req.valid('query');
     const db = createDb(c.env.DB);
 
-    const block = await loadActiveBlock(db);
+    const block = await loadActiveBlock(db, userId);
     if (!block) {
       return c.json({ activeBlock: null, date, planned: null, logs: [], hint: null });
     }
@@ -172,7 +174,7 @@ export const trainRoute = new Hono<AppBindings>()
         performedAt: trainingLogs.performedAt,
       })
       .from(trainingLogs)
-      .where(and(eq(trainingLogs.userId, USER_ID), eq(trainingLogs.performedAt, date)));
+      .where(and(eq(trainingLogs.userId, userId), eq(trainingLogs.performedAt, date)));
 
     return c.json({
       activeBlock: blockSummary,
@@ -188,24 +190,26 @@ export const trainRoute = new Hono<AppBindings>()
   })
 
   .get('/checkin', zValidator('query', trainDateQuerySchema), async (c) => {
+    const userId = c.get('userId');
     const { date } = c.req.valid('query');
     const db = createDb(c.env.DB);
     const row = await db
       .select()
       .from(userConditions)
-      .where(and(eq(userConditions.userId, USER_ID), eq(userConditions.recordedAt, date)))
+      .where(and(eq(userConditions.userId, userId), eq(userConditions.recordedAt, date)))
       .get();
     return c.json({ checkin: row ?? null });
   })
 
   .post('/checkin', zValidator('json', checkinInputSchema), async (c) => {
+    const userId = c.get('userId');
     const input = c.req.valid('json');
     const db = createDb(c.env.DB);
 
     const existing = await db
       .select({ id: userConditions.id })
       .from(userConditions)
-      .where(and(eq(userConditions.userId, USER_ID), eq(userConditions.recordedAt, input.date)))
+      .where(and(eq(userConditions.userId, userId), eq(userConditions.recordedAt, input.date)))
       .get();
 
     if (existing) {
@@ -225,7 +229,7 @@ export const trainRoute = new Hono<AppBindings>()
     const inserted = await db
       .insert(userConditions)
       .values({
-        userId: USER_ID,
+        userId,
         recordedAt: input.date,
         sleepHours: input.sleepHours ?? null,
         conditionScore: input.conditionScore ?? null,
@@ -239,6 +243,7 @@ export const trainRoute = new Hono<AppBindings>()
 
   // 한 세션의 세트들을 일괄 upsert. 같은 (program_set_id, performed_at:date) 면 update.
   .post('/sets', zValidator('json', sessionLogInputSchema), async (c) => {
+    const userId = c.get('userId');
     const { date, sets } = c.req.valid('json');
     const db = createDb(c.env.DB);
 
@@ -268,7 +273,7 @@ export const trainRoute = new Hono<AppBindings>()
     const existingRows = await db
       .select({ id: trainingLogs.id, programSetId: trainingLogs.programSetId })
       .from(trainingLogs)
-      .where(and(eq(trainingLogs.userId, USER_ID), eq(trainingLogs.performedAt, date)));
+      .where(and(eq(trainingLogs.userId, userId), eq(trainingLogs.performedAt, date)));
     for (const r of existingRows) {
       if (r.programSetId !== null) existingByProgramSetId.set(r.programSetId, r.id);
     }
@@ -292,7 +297,7 @@ export const trainRoute = new Hono<AppBindings>()
         updated++;
       } else {
         toInsert.push({
-          userId: USER_ID,
+          userId,
           programSetId: s.programSetId,
           exerciseId: s.exerciseId,
           performedAt: date,

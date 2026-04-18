@@ -6,10 +6,8 @@ import { exercises, programBlocks, programSets } from '@linex/shared/schema';
 import { createBlockInputSchema, patchWeekInputSchema } from '@linex/shared/validators/api/coach';
 
 import { createDb } from '../lib/db.ts';
+import { requireUser } from '../middleware/auth.ts';
 import type { AppBindings } from '../types.ts';
-
-// 단일 유저 가정 — infra_model.md §1
-const USER_ID = 1;
 
 // D1 = SQLite, 한 쿼리당 100 변수 제한. program_sets row 당 8 컬럼 → 12 row 씩 청크.
 const SETS_INSERT_CHUNK = 12;
@@ -21,6 +19,7 @@ function computeEndDate(startDateIso: string, weeks: number): string {
 }
 
 export const coachRoute = new Hono<AppBindings>()
+  .use('*', requireUser)
   .get('/exercises', async (c) => {
     const db = createDb(c.env.DB);
     const list = await db
@@ -37,6 +36,7 @@ export const coachRoute = new Hono<AppBindings>()
   // 수동 코치 모드: Step 1 (블럭 파라미터) + Step 2 (주 1 템플릿) → DB 적재
   // 백엔드가 주 1 을 weeks 만큼 복제해서 program_sets 일괄 insert.
   .post('/blocks', zValidator('json', createBlockInputSchema), async (c) => {
+    const userId = c.get('userId');
     const input = c.req.valid('json');
     const db = createDb(c.env.DB);
 
@@ -55,12 +55,12 @@ export const coachRoute = new Hono<AppBindings>()
     await db
       .update(programBlocks)
       .set({ isActive: false })
-      .where(and(eq(programBlocks.userId, USER_ID), eq(programBlocks.isActive, true)));
+      .where(and(eq(programBlocks.userId, userId), eq(programBlocks.isActive, true)));
 
     const inserted = await db
       .insert(programBlocks)
       .values({
-        userId: USER_ID,
+        userId: userId,
         weeks: input.weeks,
         daysPerWeek: input.daysPerWeek,
         selectedDays: JSON.stringify(input.selectedDays),
@@ -109,13 +109,14 @@ export const coachRoute = new Hono<AppBindings>()
     return c.json({ block_id: blockId, sets_inserted: setRows.length, end_date: endDate });
   })
   .get('/blocks/:id', async (c) => {
+    const userId = c.get('userId');
     const id = Number(c.req.param('id'));
     if (!Number.isInteger(id) || id <= 0) {
       return c.json({ error: 'invalid_id' }, 400);
     }
     const db = createDb(c.env.DB);
     const block = await db.select().from(programBlocks).where(eq(programBlocks.id, id)).get();
-    if (!block || block.userId !== USER_ID) {
+    if (!block || block.userId !== userId) {
       return c.json({ error: 'not_found' }, 404);
     }
     const sets = await db
@@ -138,6 +139,7 @@ export const coachRoute = new Hono<AppBindings>()
   })
   // 특정 주 sets 통째 교체. 주 단위 편집용.
   .patch('/blocks/:id/week/:weekNo', zValidator('json', patchWeekInputSchema), async (c) => {
+    const userId = c.get('userId');
     const id = Number(c.req.param('id'));
     const weekNo = Number(c.req.param('weekNo'));
     if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(weekNo) || weekNo <= 0) {
@@ -148,7 +150,7 @@ export const coachRoute = new Hono<AppBindings>()
     const db = createDb(c.env.DB);
 
     const block = await db.select().from(programBlocks).where(eq(programBlocks.id, id)).get();
-    if (!block || block.userId !== USER_ID) {
+    if (!block || block.userId !== userId) {
       return c.json({ error: 'not_found' }, 404);
     }
     if (weekNo > block.weeks) {

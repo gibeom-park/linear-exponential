@@ -2,7 +2,7 @@
 
 `total_plan.md` §5 의 Phase 1~4 에 완료 기준을 추가하고 Phase 0 (사전 결정) 을 명시. 각 Phase 가 끝났는지 확인 가능한 체크리스트 + 검증 명령을 함께 둠.
 
-마지막 갱신: 2026-04-18 — **MVP 완료** (Phase 0~3 모두 ✅). Phase 2 는 수동 코치 모드로 재구성됨. AI 통합(Gemini) 은 Post-MVP 로 이동. 이전 LLM 기반 설계는 [`archive/prompts_model.md`](./archive/prompts_model.md) 에 보존.
+마지막 갱신: 2026-04-18 — Phase 4 (멀티유저 전환) 진행. Phase 0~3 ✅ MVP 완료. Phase 2 는 수동 코치 모드로 재구성됨. AI 통합(Gemini) 은 Post-MVP 로 이동. 이전 LLM 기반 설계는 [`archive/prompts_model.md`](./archive/prompts_model.md) 에 보존.
 
 관련: [`domain_model.md`](./domain_model.md), [`infra_model.md`](./infra_model.md), [`total_plan_suggestions.md`](./total_plan_suggestions.md)
 
@@ -120,6 +120,44 @@ pnpm dev
 
 ---
 
+## Phase 4 — 멀티유저 전환 (초대 코드 가입)
+
+**상태: 🚧 진행 중 (브랜치 `phase4-multiuser`)**
+
+> Cloudflare Access 가 이메일 본인 인증을 처리하지만 무분별한 가입은 막아야 함 → **초대 코드** 를 추가 게이트로 둔다. (Cf-Access 통과 + INVITE_CODE 일치) 인 사용자만 `users` 행이 생성되고 이후 코치/훈련 라우트를 사용할 수 있다. 단일 공유 시크릿, 무기한 유효, rate-limit 없음.
+
+### Done definition (모두 ✓ 가 되면 종료)
+- [x] `users.email` NOT NULL UNIQUE 로 강화 (마이그레이션 `0002_user_email_unique.sql` — 기존 NULL 행은 owner 이메일로 backfill 후 DROP+CREATE)
+- [x] `backend/src/middleware/auth.ts` (`resolveEmail` + `requireUser`): Cf-Access-Authenticated-User-Email 헤더로 email → DB 조회 → `c.set('userId')`. 미등록 사용자는 401 `{ error: 'registration_required', email }`. 로컬 dev 는 `DEV_USER_EMAIL` fallback, 테스트는 `DEV_USER_ID` 단락
+- [x] `POST /api/auth/register`: Cf-Access 이메일 + 초대 코드 검증 (constant-time) → `users` + 기본 `settings` 행 INSERT. 잘못된 코드 403 / 미인증 401 / 이미 가입 409
+- [x] `GET /api/auth/me`: requireUser 통과 시 `{ id, email }` (프론트 가입 확인용)
+- [x] `coach.ts` / `train.ts` 의 하드코딩된 `USER_ID = 1` 제거 → `c.get('userId')` 사용. `requireUser` 미들웨어 적용
+- [x] `INVITE_CODE` env 정의 (`backend/src/types.ts` + `.dev.vars` + `.dev.vars.example`). prod 는 `wrangler secret put INVITE_CODE`
+- [x] 백엔드 단위 테스트: `auth.test.ts` (middleware 단락 / 헤더 우선 / 미인증 401), `routes/auth.test.ts` (register 401/403/409/400, /me 단락 통과)
+- [x] 프론트 `/register` 페이지: 코드 입력 → POST → 성공 시 홈으로. `lib/apiFetch.ts` 의 window.fetch 인터셉터가 401 `registration_required` 응답을 받으면 자동으로 `/register` 로 리다이렉트
+- [x] 마이그레이션 적용: 로컬 ✅ — 원격 + secret 등록은 사용자 트리거 대기
+- [ ] 원격 D1 마이그레이션 + `wrangler secret put INVITE_CODE` (사용자 수동)
+- [ ] 본인 계정으로 로컬 가입 → 홈 진입 → 코치/훈련 정상 동작 확인
+- [ ] 로컬 `/register` 에서 잘못된 코드 → 403 빨간 메시지, 정상 코드 → 홈 리다이렉트 확인
+
+### Verification
+```
+# 단위 테스트
+pnpm --filter @linex/backend test    # 55 passed
+pnpm typecheck                        # all clean
+
+# 로컬: register flow
+pnpm dev → 브라우저 → /coach 진입 시 인터셉터가 /register 로 자동 이동
+       → 코드 입력 (.dev.vars 의 INVITE_CODE) → 가입 → 홈 → /coach 정상
+
+# 원격 적용 (사용자 수동)
+pnpm --filter @linex/backend db:migrate:remote
+pnpm --filter @linex/backend exec wrangler secret put INVITE_CODE
+pnpm run deploy
+```
+
+---
+
 ## Post-MVP — AI 도입 / 고도화 (DEFERRED)
 
 **상태: ⏸ 보류** — Workers KR PoP 의 Gemini geo-restriction + 우회 인프라 비용 + 사용 패턴(어차피 수정) 을 이유로 무기한 보류. 재도입 시 [`archive/prompts_model.md`](./archive/prompts_model.md) 의 1차 설계를 출발점으로 사용.
@@ -131,7 +169,6 @@ pnpm dev
 - 분석 인사이트: training_logs + user_conditions 교차 분석 → 인사이트 카드 (D 섹션)
 
 ### 그 외 Post-MVP 후보
-- 멀티 유저 전환 (B1 → 인증/회원가입 흐름)
 - 추가 주기화 모델 (5/3/1, GZCL 등)
 - 분석 인사이트 푸시/이메일 알림
 - D1 → R2 백업 자동화 (B Open Questions)
