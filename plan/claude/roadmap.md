@@ -94,7 +94,7 @@ pnpm dev
 
 ## Phase 3 — 훈련 모드 MVP
 
-**상태: 🚧 거의 완료 — 로컬 E2E 시연 + 모바일 실기기 PWA 설치 검증만 남음 (사용자 수동)**
+**상태: 🚧 거의 완료 — 모바일 실기기 PWA 설치 검증만 남음 (사용자 수동)**
 
 > Phase 2 의 결정 (calendar nav / 체크인 선택 / ±10% 경고만 / 같은 날 재진입 허용) 을 그대로 반영. 백엔드 PR A (#5) → 프론트엔드 PR B (#6) → 오프라인 + PWA PR C 순으로 분리.
 
@@ -106,7 +106,7 @@ pnpm dev
 - [x] 온라인 복귀 시 자동 flush — `online` 이벤트 + 페이지 진입 시 1회 시도 + react-query 캐시 무효화로 즉시 반영
 - [x] Service Worker (`vite-plugin-pwa`): 앱 셸 precache, API NetworkFirst (5s timeout), 카탈로그 SWR
 - [x] PWA manifest + viewport: SVG 아이콘 (any+maskable), apple-touch-icon, viewport-fit=cover, portrait 강제, status-bar-style black-translucent
-- [ ] 로컬 E2E 시연: `pnpm dev` + Chrome DevTools Network throttling=Offline → 세트 입력 → 큐 적재 확인 → Online → flush → D1 반영 확인 (**사용자 시연**)
+- [x] 로컬 E2E 시연 (Playwright): `pnpm dev` → `/train` → fetch override 로 POST sets 차단 → 세션 저장 → outbox 1건 적재 + "대기 1건" 배지 → fetch 복구 + "지금 보내기" → flush → outbox 0 + D1 갱신 확인 (2026-04-18)
 - [ ] iOS Safari / Android Chrome 실기기 PWA 설치 후 오프라인 동작 시연 (**사용자 시연**)
 
 ### Verification
