@@ -27,9 +27,7 @@ export function ExerciseCardEditor({
 
   const removeSet = (idx: number) => {
     if (exercise.sets.length <= 1) return;
-    const sets = exercise.sets
-      .filter((_, i) => i !== idx)
-      .map((s, i) => ({ ...s, setNo: i + 1 }));
+    const sets = exercise.sets.filter((_, i) => i !== idx).map((s, i) => ({ ...s, setNo: i + 1 }));
     onChange({ ...exercise, sets });
   };
 
@@ -57,11 +55,11 @@ export function ExerciseCardEditor({
           <div>회</div>
           <div>kg</div>
           <div>RPE</div>
-          <div></div>
+          <div />
         </div>
         {exercise.sets.map((s, i) => (
           <div
-            key={i}
+            key={s.setNo}
             className="grid grid-cols-[2rem_1fr_1fr_1fr_1.75rem] items-center gap-1"
           >
             <div className="text-xs text-muted-foreground">{s.setNo}</div>

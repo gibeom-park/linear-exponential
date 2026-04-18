@@ -52,11 +52,7 @@ interface BlockDetailEditorProps {
   exercises: ExerciseOption[];
 }
 
-function setsToWeekDrafts(
-  sets: SetRow[],
-  weekNo: number,
-  selectedDays: DayOfWeek[],
-): DayDraft[] {
+function setsToWeekDrafts(sets: SetRow[], weekNo: number, selectedDays: DayOfWeek[]): DayDraft[] {
   const byDay = new Map<number, DayDraft>();
   for (let i = 0; i < selectedDays.length; i++) {
     byDay.set(i + 1, { dayNo: i + 1, exercises: [] });
@@ -94,9 +90,7 @@ export function BlockDetailEditor({ block, sets, exercises }: BlockDetailEditorP
   }, [block.selectedDays]);
 
   const [activeWeek, setActiveWeek] = useState(1);
-  const [drafts, setDrafts] = useState<DayDraft[]>(() =>
-    setsToWeekDrafts(sets, 1, selectedDays),
-  );
+  const [drafts, setDrafts] = useState<DayDraft[]>(() => setsToWeekDrafts(sets, 1, selectedDays));
 
   useEffect(() => {
     setDrafts(setsToWeekDrafts(sets, activeWeek, selectedDays));
@@ -141,8 +135,8 @@ export function BlockDetailEditor({ block, sets, exercises }: BlockDetailEditorP
               </div>
             </div>
             <div className="text-xs text-muted-foreground">
-              SQ {block.squat1rmKg} · BP {block.bench1rmKg} · DL {block.deadlift1rmKg}{' '}
-              ({block.deadliftStance === 'sumo' ? '스모' : '컨벤'})
+              SQ {block.squat1rmKg} · BP {block.bench1rmKg} · DL {block.deadlift1rmKg} (
+              {block.deadliftStance === 'sumo' ? '스모' : '컨벤'})
             </div>
           </div>
           {block.notes && (

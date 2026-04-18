@@ -46,7 +46,7 @@ export function DayColumn({ day, label, exercises, onChange }: DayColumnProps) {
       <CardContent className="px-3 space-y-2">
         {day.exercises.map((ex, i) => (
           <ExerciseCardEditor
-            key={i}
+            key={ex.exerciseId}
             exercise={ex}
             exerciseName={exerciseMap.get(ex.exerciseId) ?? `#${ex.exerciseId}`}
             exercises={exercises}

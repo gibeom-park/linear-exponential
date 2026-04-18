@@ -3,10 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 
 import { exercises, programBlocks, programSets } from '@linex/shared/schema';
-import {
-  createBlockInputSchema,
-  patchWeekInputSchema,
-} from '@linex/shared/validators/api/coach';
+import { createBlockInputSchema, patchWeekInputSchema } from '@linex/shared/validators/api/coach';
 
 import { createDb } from '../lib/db.ts';
 import type { AppBindings } from '../types.ts';
@@ -45,9 +42,7 @@ export const coachRoute = new Hono<AppBindings>()
 
     const exerciseIds = new Set(input.week1.flatMap((d) => d.exercises.map((e) => e.exerciseId)));
     if (exerciseIds.size > 0) {
-      const found = await db
-        .select({ id: exercises.id })
-        .from(exercises);
+      const found = await db.select({ id: exercises.id }).from(exercises);
       const known = new Set(found.map((e) => e.id));
       const missing = [...exerciseIds].filter((id) => !known.has(id));
       if (missing.length > 0) {
@@ -171,7 +166,10 @@ export const coachRoute = new Hono<AppBindings>()
     }
 
     const dayNoSet = new Set(days.map((d) => d.dayNo));
-    if (dayNoSet.size !== days.length || [...dayNoSet].some((n) => n < 1 || n > block.daysPerWeek)) {
+    if (
+      dayNoSet.size !== days.length ||
+      [...dayNoSet].some((n) => n < 1 || n > block.daysPerWeek)
+    ) {
       return c.json({ error: 'invalid_day_no' }, 400);
     }
 

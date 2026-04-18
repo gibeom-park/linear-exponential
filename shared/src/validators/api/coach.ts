@@ -2,9 +2,7 @@ import { z } from 'zod';
 
 import { DAY_OF_WEEK, DEADLIFT_STANCE } from '../../enums.ts';
 
-const isoDate = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD 형식 필요');
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD 형식 필요');
 
 export const setInputSchema = z.object({
   setNo: z.number().int().min(1).max(20),

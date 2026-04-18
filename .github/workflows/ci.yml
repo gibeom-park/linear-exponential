@@ -36,3 +36,6 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+      - name: Build (frontend)
+        run: pnpm --filter frontend build

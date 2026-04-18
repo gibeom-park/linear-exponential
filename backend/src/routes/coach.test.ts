@@ -3,10 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import {
-  createBlockInputSchema,
-  patchWeekInputSchema,
-} from '@linex/shared/validators/api/coach';
+import { createBlockInputSchema, patchWeekInputSchema } from '@linex/shared/validators/api/coach';
 
 import app from '../index.ts';
 
@@ -23,21 +20,15 @@ const VALID_BLOCK_INPUT = {
   week1: [
     {
       dayNo: 1,
-      exercises: [
-        { exerciseId: 1, sets: [{ setNo: 1, reps: 5, weightKg: 100, rpe: 7 }] },
-      ],
+      exercises: [{ exerciseId: 1, sets: [{ setNo: 1, reps: 5, weightKg: 100, rpe: 7 }] }],
     },
     {
       dayNo: 2,
-      exercises: [
-        { exerciseId: 1, sets: [{ setNo: 1, reps: 5, weightKg: 100, rpe: 7 }] },
-      ],
+      exercises: [{ exerciseId: 1, sets: [{ setNo: 1, reps: 5, weightKg: 100, rpe: 7 }] }],
     },
     {
       dayNo: 3,
-      exercises: [
-        { exerciseId: 1, sets: [{ setNo: 1, reps: 5, weightKg: 100, rpe: 7 }] },
-      ],
+      exercises: [{ exerciseId: 1, sets: [{ setNo: 1, reps: 5, weightKg: 100, rpe: 7 }] }],
     },
   ],
 };
@@ -92,11 +83,7 @@ describe('createBlockInputSchema (zod)', () => {
   it('week1.dayNo 중복 불가', () => {
     const r = createBlockInputSchema.safeParse({
       ...VALID_BLOCK_INPUT,
-      week1: [
-        VALID_BLOCK_INPUT.week1[0],
-        VALID_BLOCK_INPUT.week1[0],
-        VALID_BLOCK_INPUT.week1[2],
-      ],
+      week1: [VALID_BLOCK_INPUT.week1[0], VALID_BLOCK_INPUT.week1[0], VALID_BLOCK_INPUT.week1[2]],
     });
     expect(r.success).toBe(false);
   });
@@ -122,8 +109,12 @@ describe('createBlockInputSchema (zod)', () => {
   });
 
   it('weeks 범위 (2~8) 강제', () => {
-    expect(createBlockInputSchema.safeParse({ ...VALID_BLOCK_INPUT, weeks: 1 }).success).toBe(false);
-    expect(createBlockInputSchema.safeParse({ ...VALID_BLOCK_INPUT, weeks: 9 }).success).toBe(false);
+    expect(createBlockInputSchema.safeParse({ ...VALID_BLOCK_INPUT, weeks: 1 }).success).toBe(
+      false,
+    );
+    expect(createBlockInputSchema.safeParse({ ...VALID_BLOCK_INPUT, weeks: 9 }).success).toBe(
+      false,
+    );
   });
 });
 
