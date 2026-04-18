@@ -2,7 +2,7 @@
 
 `total_plan.md` §5 의 Phase 1~4 에 완료 기준을 추가하고 Phase 0 (사전 결정) 을 명시. 각 Phase 가 끝났는지 확인 가능한 체크리스트 + 검증 명령을 함께 둠.
 
-마지막 갱신: 2026-04-18 — Phase 2 를 수동 코치 모드로 재구성. AI 통합(Gemini) 은 Post-MVP 로 이동. 이전 LLM 기반 설계는 [`archive/prompts_model.md`](./archive/prompts_model.md) 에 보존.
+마지막 갱신: 2026-04-18 — **MVP 완료** (Phase 0~3 모두 ✅). Phase 2 는 수동 코치 모드로 재구성됨. AI 통합(Gemini) 은 Post-MVP 로 이동. 이전 LLM 기반 설계는 [`archive/prompts_model.md`](./archive/prompts_model.md) 에 보존.
 
 관련: [`domain_model.md`](./domain_model.md), [`infra_model.md`](./infra_model.md), [`total_plan_suggestions.md`](./total_plan_suggestions.md)
 
@@ -94,7 +94,7 @@ pnpm dev
 
 ## Phase 3 — 훈련 모드 MVP
 
-**상태: 🚧 거의 완료 — 모바일 실기기 PWA 설치 검증만 남음 (사용자 수동)**
+**상태: ✅ 완료 (2026-04-18)**
 
 > Phase 2 의 결정 (calendar nav / 체크인 선택 / ±10% 경고만 / 같은 날 재진입 허용) 을 그대로 반영. 백엔드 PR A (#5) → 프론트엔드 PR B (#6) → 오프라인 + PWA PR C 순으로 분리.
 
@@ -107,7 +107,7 @@ pnpm dev
 - [x] Service Worker (`vite-plugin-pwa`): 앱 셸 precache, API NetworkFirst (5s timeout), 카탈로그 SWR
 - [x] PWA manifest + viewport: SVG 아이콘 (any+maskable), apple-touch-icon, viewport-fit=cover, portrait 강제, status-bar-style black-translucent
 - [x] 로컬 E2E 시연 (Playwright): `pnpm dev` → `/train` → fetch override 로 POST sets 차단 → 세션 저장 → outbox 1건 적재 + "대기 1건" 배지 → fetch 복구 + "지금 보내기" → flush → outbox 0 + D1 갱신 확인 (2026-04-18)
-- [ ] iOS Safari / Android Chrome 실기기 PWA 설치 후 오프라인 동작 시연 (**사용자 시연**)
+- [x] iOS Safari / Android Chrome 실기기 PWA 설치 후 오프라인 동작 시연 (사용자 확인, 2026-04-18)
 
 ### Verification
 - 단위: `pnpm --filter @linex/frontend test` (outbox 8케이스: enqueue / LWW / flush 200/4xx/5xx/network-error / 부분 성공)
