@@ -1,128 +1,166 @@
-// 라우트 단위 테스트. D1 happy-path 는 E2E (#23 wrangler dev) 로 검증.
-// preview: 입력검증 + Gemini 에러 분기 + LLM JSON 검증 분기 + 4개 프로그램 라우팅.
+// 코치 라우트 단위 테스트 — 입력 검증 / 라우팅 / 에러 분기.
+// DB 가 실제로 쓰이는 happy path 는 E2E (`pnpm dev`) 에서 검증.
 
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
+
+import {
+  createBlockInputSchema,
+  patchWeekInputSchema,
+} from '@linex/shared/validators/api/coach';
 
 import app from '../index.ts';
 
-const VALID_INPUT = {
-  programType: 'linear',
+const VALID_BLOCK_INPUT = {
   weeks: 6,
-  daysPerWeek: 4,
+  daysPerWeek: 3,
+  selectedDays: ['mon', 'wed', 'fri'],
+  startDate: '2026-04-20',
   squat1rmKg: 180,
   bench1rmKg: 130,
   deadlift1rmKg: 220,
   deadliftStance: 'conventional',
-};
-
-const VALID_PLAN_RESPONSE = JSON.stringify({
-  weeks: [
+  notes: null,
+  week1: [
     {
-      week_no: 1,
-      days: [
-        {
-          day_no: 1,
-          exercises: [
-            { name: '백 스쿼트', sets: [{ set_no: 1, reps: 5, weight_kg: 100, rpe: 7 }] },
-          ],
-        },
+      dayNo: 1,
+      exercises: [
+        { exerciseId: 1, sets: [{ setNo: 1, reps: 5, weightKg: 100, rpe: 7 }] },
+      ],
+    },
+    {
+      dayNo: 2,
+      exercises: [
+        { exerciseId: 1, sets: [{ setNo: 1, reps: 5, weightKg: 100, rpe: 7 }] },
+      ],
+    },
+    {
+      dayNo: 3,
+      exercises: [
+        { exerciseId: 1, sets: [{ setNo: 1, reps: 5, weightKg: 100, rpe: 7 }] },
       ],
     },
   ],
+};
+
+function postCoach(path: string, body: unknown) {
+  return app.request(`/api/coach${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+function patchCoach(path: string, body: unknown) {
+  return app.request(`/api/coach${path}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+describe('createBlockInputSchema (zod)', () => {
+  it('정상 입력 통과', () => {
+    const r = createBlockInputSchema.safeParse(VALID_BLOCK_INPUT);
+    expect(r.success).toBe(true);
+  });
+
+  it('selectedDays 길이 ≠ daysPerWeek 면 실패', () => {
+    const r = createBlockInputSchema.safeParse({
+      ...VALID_BLOCK_INPUT,
+      daysPerWeek: 4,
+      selectedDays: ['mon', 'wed', 'fri'],
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it('selectedDays 중복 불가', () => {
+    const r = createBlockInputSchema.safeParse({
+      ...VALID_BLOCK_INPUT,
+      selectedDays: ['mon', 'mon', 'fri'],
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it('week1 day 개수 ≠ daysPerWeek 면 실패', () => {
+    const r = createBlockInputSchema.safeParse({
+      ...VALID_BLOCK_INPUT,
+      week1: VALID_BLOCK_INPUT.week1.slice(0, 2),
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it('week1.dayNo 중복 불가', () => {
+    const r = createBlockInputSchema.safeParse({
+      ...VALID_BLOCK_INPUT,
+      week1: [
+        VALID_BLOCK_INPUT.week1[0],
+        VALID_BLOCK_INPUT.week1[0],
+        VALID_BLOCK_INPUT.week1[2],
+      ],
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it('week1.dayNo > daysPerWeek 면 실패', () => {
+    const r = createBlockInputSchema.safeParse({
+      ...VALID_BLOCK_INPUT,
+      week1: [
+        { ...VALID_BLOCK_INPUT.week1[0], dayNo: 5 },
+        VALID_BLOCK_INPUT.week1[1],
+        VALID_BLOCK_INPUT.week1[2],
+      ],
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it('startDate ISO 형식 강제', () => {
+    const r = createBlockInputSchema.safeParse({
+      ...VALID_BLOCK_INPUT,
+      startDate: '2026/04/20',
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it('weeks 범위 (2~8) 강제', () => {
+    expect(createBlockInputSchema.safeParse({ ...VALID_BLOCK_INPUT, weeks: 1 }).success).toBe(false);
+    expect(createBlockInputSchema.safeParse({ ...VALID_BLOCK_INPUT, weeks: 9 }).success).toBe(false);
+  });
 });
 
-function postCoach(path: string, body: unknown, env: Record<string, unknown> = {}) {
-  return app.request(
-    `/api/coach${path}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    },
-    { GEMINI_API_KEY: 'test-key', GEMINI_MODEL: 'gemini-3-flash-preview', ...env },
-  );
-}
-
-function mockGeminiResponse(text: string) {
-  return vi.spyOn(globalThis, 'fetch').mockImplementation(
-    (async () =>
-      new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text }] } }] }), {
-        status: 200,
-      })) as typeof fetch,
-  );
-}
-
-describe('POST /api/coach/preview', () => {
-  afterEach(() => vi.restoreAllMocks());
-
-  it('잘못된 입력은 400', async () => {
-    const res = await postCoach('/preview', { programType: 'linear', weeks: 1 });
-    expect(res.status).toBe(400);
+describe('patchWeekInputSchema (zod)', () => {
+  it('정상 입력 통과', () => {
+    const r = patchWeekInputSchema.safeParse({ days: VALID_BLOCK_INPUT.week1 });
+    expect(r.success).toBe(true);
   });
 
-  it('GEMINI_API_KEY 누락 시 500', async () => {
-    const res = await postCoach('/preview', VALID_INPUT, { GEMINI_API_KEY: undefined });
-    expect(res.status).toBe(500);
-    expect(await res.json()).toMatchObject({ error: /GEMINI_API_KEY/ });
+  it('빈 days 배열 실패', () => {
+    const r = patchWeekInputSchema.safeParse({ days: [] });
+    expect(r.success).toBe(false);
   });
-
-  it('Gemini HTTP 실패는 502', async () => {
-    vi.spyOn(globalThis, 'fetch').mockImplementation(
-      (async () => new Response('boom', { status: 500 })) as typeof fetch,
-    );
-    const res = await postCoach('/preview', VALID_INPUT);
-    expect(res.status).toBe(502);
-    expect(await res.json()).toMatchObject({ error: 'gemini_call_failed' });
-  });
-
-  it('LLM 출력이 스키마와 안 맞으면 502', async () => {
-    mockGeminiResponse('{"weeks":[{"oops":1}]}');
-    const res = await postCoach('/preview', VALID_INPUT);
-    expect(res.status).toBe(502);
-    expect(await res.json()).toMatchObject({ error: 'llm_output_invalid' });
-  });
-
-  it('성공 시 plan + model + prompt_version 반환 (DB 미저장)', async () => {
-    mockGeminiResponse(VALID_PLAN_RESPONSE);
-    const res = await postCoach('/preview', VALID_INPUT);
-    expect(res.status).toBe(200);
-    const body = await res.json<{ plan: unknown; model: string; prompt_version: number }>();
-    expect(body.plan).toMatchObject({ weeks: expect.any(Array) });
-    expect(body.model).toBe('gemini-3-flash-preview');
-    expect(body.prompt_version).toBe(1);
-  });
-
-  for (const programType of ['linear', 'dup', 'block', 'conjugate']) {
-    it(`programType=${programType} 에 맞는 프롬프트로 라우팅 (system prompt 본문 확인)`, async () => {
-      let captured: { systemInstruction?: { parts?: Array<{ text?: string }> } } | undefined;
-      vi.spyOn(globalThis, 'fetch').mockImplementation((async (_url: string, init: RequestInit) => {
-        captured = JSON.parse(init.body as string);
-        return new Response('{ "candidates": [] }', { status: 200 });
-      }) as typeof fetch);
-
-      const res = await postCoach('/preview', { ...VALID_INPUT, programType });
-      // candidates 비어있어 502 (gemini_call_failed) 가 정상. 여기선 라우팅만 확인.
-      expect(res.status).toBe(502);
-      const sys = captured?.systemInstruction?.parts?.[0]?.text ?? '';
-      const programLabel = {
-        linear: 'Linear Periodization',
-        dup: 'DUP',
-        block: 'Block Periodization',
-        conjugate: 'Conjugate',
-      }[programType as 'linear' | 'dup' | 'block' | 'conjugate'];
-      expect(sys).toContain(programLabel);
-    });
-  }
 });
 
 describe('POST /api/coach/blocks', () => {
-  it('잘못된 input 은 400', async () => {
-    const res = await postCoach('/blocks', { input: { programType: 'linear' }, plan: {} });
+  it('잘못된 입력은 400', async () => {
+    const res = await postCoach('/blocks', { weeks: 1 });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('PATCH /api/coach/blocks/:id/week/:weekNo', () => {
+  it('잘못된 id 는 400', async () => {
+    const res = await patchCoach('/blocks/abc/week/1', { days: VALID_BLOCK_INPUT.week1 });
     expect(res.status).toBe(400);
   });
 
-  it('잘못된 plan 은 400', async () => {
-    const res = await postCoach('/blocks', { input: VALID_INPUT, plan: { weeks: 'nope' } });
+  it('잘못된 입력은 400', async () => {
+    const res = await patchCoach('/blocks/1/week/1', { days: [] });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('GET /api/coach/blocks/:id', () => {
+  it('잘못된 id 는 400', async () => {
+    const res = await app.request('/api/coach/blocks/abc');
     expect(res.status).toBe(400);
   });
 });

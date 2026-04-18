@@ -1,11 +1,4 @@
 # Runtime secrets injected into the Worker during `wrangler dev`.
 # Copy to .dev.vars and fill in. Wrangler auto-reads .dev.vars (do NOT rename).
-# In production: wrangler secret put GEMINI_API_KEY
 #
-# See: plan/claude/infra_model.md §2 (Gemini API 키 관리)
-
-GEMINI_API_KEY=
-
-# Override the default Gemini model declared in prompt frontmatter.
-# Phase 2 default: gemini-3-flash-preview (prompts_model.md §6).
-GEMINI_MODEL=gemini-3-flash-preview
+# Phase 2 (수동 코치 모드) 에는 외부 API 키 없음. 비워두거나 파일 자체를 두지 않아도 됨.

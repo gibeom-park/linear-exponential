@@ -1,8 +1,8 @@
 // 도메인 enum 통합 모듈. domain_model.md / infra_model.md 참조.
 // SQLite 에는 enum 타입이 없으므로 Drizzle 컬럼은 text + zod enum 으로 강제한다.
 
-export const PROGRAM_TYPE = ['linear', 'dup', 'block', 'conjugate'] as const;
-export type ProgramType = (typeof PROGRAM_TYPE)[number];
+export const DAY_OF_WEEK = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
+export type DayOfWeek = (typeof DAY_OF_WEEK)[number];
 
 export const E1RM_FORMULA = ['epley', 'brzycki', 'lombardi', 'oconner'] as const;
 export type E1rmFormula = (typeof E1RM_FORMULA)[number];
