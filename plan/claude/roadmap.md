@@ -22,7 +22,7 @@
 
 ## Phase 1 — 인프라 & DB 셋업
 
-**상태: 🚧 거의 완료 — 사용자 수동 단계 1건 남음 (Cloudflare Access 본인 이메일 등록)**
+**상태: ✅ 완료 (2026-04-18)**
 
 ### Done definition (모두 ✓ 가 되면 종료)
 - [x] pnpm workspace 초기화: `frontend/`, `backend/`, `shared/` 3패키지 + 루트 설정
@@ -34,7 +34,7 @@
 - [x] `shared/enums.ts` 도메인 enum 7종
 - [x] 마이그레이션 실행: `0000_init.sql` 로컬 + 원격 적용
 - [x] 시드 적재: `users(id=1)`, `settings(kg/epley/conventional)`, `exercises` 107행 (메인 3 + 변형 58 + 보조 46)
-- [ ] Cloudflare Access 본인 이메일 등록 — 절차는 `README.md` 에 문서화, **사용자 대시보드 작업 필요**
+- [x] Cloudflare Access 본인 이메일 등록 — Application `linex` + Policy `owner-only` (Include Emails=kibumchy@gmail.com) 확인
 - [x] Hono 앱 + `GET /api/health` (200 OK + 단위 테스트 통과)
 - [x] Biome 루트 설정 → 전 패키지 lint 통과
 - [x] GitHub Actions CI 워크플로우 (`.github/workflows/ci.yml`): lint → typecheck → test → frontend build, PR / main push 트리거
