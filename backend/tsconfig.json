@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["@cloudflare/workers-types"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "hono/jsx",
+    "paths": {
+      "@linex/shared": ["../shared/src/index.ts"],
+      "@linex/shared/*": ["../shared/src/*"]
+    }
+  },
+  "include": ["src/**/*", "scripts/**/*", "drizzle.config.ts"]
+}

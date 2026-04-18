@@ -1,0 +1,31 @@
+{
+  "name": "@linex/backend",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "dotenv -e ../.env -- wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate:local": "wrangler d1 migrations apply linex-db --local",
+    "db:migrate:remote": "dotenv -e ../.env -- wrangler d1 migrations apply linex-db --remote",
+    "db:seed:local": "wrangler d1 execute linex-db --local --file=./scripts/seed.sql",
+    "db:seed:remote": "dotenv -e ../.env -- wrangler d1 execute linex-db --remote --file=./scripts/seed.sql"
+  },
+  "dependencies": {
+    "@linex/shared": "workspace:*",
+    "drizzle-orm": "^0.36.4",
+    "hono": "^4.6.14",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241224.0",
+    "@hono/zod-validator": "^0.4.2",
+    "drizzle-kit": "^0.30.1",
+    "typescript": "^5.7.2",
+    "vitest": "^3.2.4",
+    "wrangler": "^4.83.0"
+  }
+}

@@ -23,23 +23,23 @@
 
 ## Phase 1 — 인프라 & DB 셋업
 
-**상태: ⏳ 시작 전**
+**상태: 🚧 거의 완료 — 사용자 수동 단계 2건 남음 (Access 등록, CI 1회 green push)**
 
 ### Done definition (모두 ✓ 가 되면 종료)
-- [ ] pnpm workspace 초기화: `frontend/`, `backend/`, `shared/` 3패키지 + 루트 설정
-- [ ] `frontend/` Vite + React + TS init (TanStack Router/Query, Tailwind, shadcn/ui CLI 1회)
-- [ ] `backend/` Wrangler init (Hono + TS), `wrangler.toml` 에 D1 binding 선언
-- [ ] D1 데이터베이스 생성 (로컬 + 원격), `drizzle.config.ts` 작성
-- [ ] `shared/schema.ts` Drizzle 스키마: `users`, `settings`, `exercises`, `program_blocks`, `program_sets`, `training_logs`, `user_conditions` (모두 `user_id` FK 포함, B1 절충형)
-- [ ] `shared/validators/` Zod 스키마 (drizzle-zod 자동 생성 + 도메인 검증 추가)
-- [ ] `shared/enums.ts` 도메인 enum (`program_type`, `e1rm_formula`, `unit_system`, `kind`, `parent_lift`, `muscle_group`)
-- [ ] 마이그레이션 실행: `drizzle-kit generate` → `wrangler d1 migrations apply --local` / `--remote`
-- [ ] 시드 적재: `users(id=1)`, `settings(default kg / epley / conventional)`, `exercises` (메인 3 + 변형 ~55 + 보조 ~45)
-- [ ] Cloudflare Access 본인 이메일 등록, Workers/Pages 도메인 보호 적용
-- [ ] Hono 앱 + `GET /api/health` (200 OK 반환)
-- [ ] Biome 루트 설정 → 전 패키지 lint 통과
-- [ ] GitHub Actions CI 워크플로우 (lint + test) 1회 green
-- [ ] `pnpm dev` 한 줄로 frontend + backend 동시 실행
+- [x] pnpm workspace 초기화: `frontend/`, `backend/`, `shared/` 3패키지 + 루트 설정
+- [x] `frontend/` Vite + React + TS init (TanStack Router/Query, Tailwind, shadcn/ui `components.json` 작성)
+- [x] `backend/` Wrangler init (Hono + TS), `wrangler.toml` 에 D1 binding 선언
+- [x] D1 데이터베이스 생성 (로컬 + 원격: `linex-db`, id `8a9438c0-…`), `drizzle.config.ts` 작성
+- [x] `shared/schema.ts` Drizzle 스키마: 7테이블 (users / settings / exercises / program_blocks / program_sets / training_logs / user_conditions) 모두 `user_id` FK
+- [x] `shared/validators/` Zod 스키마 (drizzle-zod + 도메인 검증)
+- [x] `shared/enums.ts` 도메인 enum 7종
+- [x] 마이그레이션 실행: `0000_init.sql` 로컬 + 원격 적용
+- [x] 시드 적재: `users(id=1)`, `settings(kg/epley/conventional)`, `exercises` 107행 (메인 3 + 변형 58 + 보조 46)
+- [ ] Cloudflare Access 본인 이메일 등록 — 절차는 `README.md` 에 문서화, **사용자 대시보드 작업 필요**
+- [x] Hono 앱 + `GET /api/health` (200 OK + 단위 테스트 통과)
+- [x] Biome 루트 설정 → 전 패키지 lint 통과
+- [ ] GitHub Actions CI 워크플로우 — `.github/workflows/ci.yml` 작성, **첫 push 시 green 확인 필요**
+- [x] `pnpm dev` 한 줄로 frontend + backend 동시 실행 (스모크 테스트 통과)
 
 ### Verification
 ```

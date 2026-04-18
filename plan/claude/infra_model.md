@@ -2,7 +2,7 @@
 
 `total_plan.md` 의 인프라/데이터 결정사항을 모은 문서. 도메인 결정은 [`domain_model.md`](./domain_model.md), 보강 트래커는 [`total_plan_suggestions.md`](./total_plan_suggestions.md).
 
-마지막 갱신: 2026-04-18 — B 섹션 1차 결정 + 프론트/백/공통 도구 스택 결정.
+마지막 갱신: 2026-04-18 — B 섹션 1차 결정 + 프론트/백/공통 도구 스택 결정 + 배포 토폴로지를 Single Worker (Static Assets) 로 정정.
 
 ---
 
@@ -138,7 +138,44 @@ linear-exponential/
 
 ---
 
-## 7. 공통 도구
+## 7. 배포 토폴로지 — Single Worker + Static Assets
+
+원래 안은 Pages + 별도 Worker 였으나, 단일 유저 PWA + Cloudflare Access 보호 요구를 감안해 **Worker 하나가 API 와 정적 자산을 모두 서빙** 하는 구조로 변경.
+
+### 구조
+```
+[브라우저]
+   │
+   ▼
+linex.<subdomain>.workers.dev  ← Cloudflare Access 정책 1개로 보호
+   │
+   ├── /api/*  →  Hono Worker  →  D1 / Gemini
+   └── 그 외   →  ASSETS 바인딩  →  frontend/dist (SPA fallback: index.html)
+```
+
+### `wrangler.toml` 핵심
+```toml
+[assets]
+directory = "../frontend/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+```
+
+### 배포 흐름
+1. `pnpm --filter frontend build` → `frontend/dist` 채움
+2. `pnpm --filter backend deploy` → Worker 코드 + 정적 자산 동시 업로드
+3. 루트 `pnpm deploy` 가 위 두 단계를 직렬로 수행
+
+### 함의
+- **단일 도메인** → CORS 불필요, 프론트 fetch 는 `/api/*` 상대 경로 그대로
+- **Cloudflare Access 정책 1개** 로 전체 앱 보호 (Pages 별도 등록 불필요)
+- **Pages 는 사용 안 함** — git 연동 preview 가 사라지므로 배포 전 검증은 로컬 `wrangler dev` 또는 별도 preview Worker 로 대체
+- 로컬 dev 는 여전히 두 갈래: Vite (5173, HMR) + `wrangler dev` (8787, /api). Vite 가 /api/* 를 8787 로 proxy. 정적 자산 바인딩은 dev 시에는 무시되지만 빌드된 `frontend/dist` 가 있으면 wrangler dev 로도 통합 미리보기 가능.
+
+---
+
+## 8. 공통 도구
 
 | 항목 | 선택 | 비고 |
 |---|---|---|
@@ -146,14 +183,14 @@ linear-exponential/
 | 백엔드 테스트 | **Vitest + Miniflare** | Workers 런타임 + D1 local 시뮬레이션 |
 | 프론트 단위 테스트 | **Vitest + Testing Library** | 컴포넌트 / 훅 |
 | E2E 테스트 | **Playwright** | 모바일 viewport + 오프라인 모드 시뮬레이션 |
-| CI/CD | **GitHub Actions** | lint → test → wrangler deploy. PR 단위 Pages preview |
+| CI/CD | **GitHub Actions** | lint → test → (수동/자동) wrangler deploy |
 | 패키지 매니저 | **pnpm** | workspace 내장, npm/yarn 대비 빠름 |
 
 ### 함의
-- 루트 `biome.json` (전 패키지 공유), 또는 패키지별 override
-- GitHub Actions workflow: `.github/workflows/{ci,deploy}.yml`
-  - CI: 모든 PR/push 에서 lint + test
-  - Deploy: main merge 시 wrangler deploy + Pages 자동 배포 (Pages 는 git 연동으로 자동, 별도 workflow 불필요할 수도)
+- 루트 `biome.json` (전 패키지 공유)
+- GitHub Actions workflow:
+  - `ci.yml`: 모든 PR/push 에서 lint + typecheck + test
+  - 배포 워크플로우는 추후 추가 (수동 trigger or main merge 시 단일 `pnpm deploy`)
 - 시크릿: GitHub Actions 에 `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` 등록
 
 ---

@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+.vite/
+.turbo/
+coverage/
+frontend/dist/
+*.tsbuildinfo
+
+# Wrangler / Cloudflare
+.wrangler/
+.dev.vars
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*

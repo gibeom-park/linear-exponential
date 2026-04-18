@@ -1,0 +1,23 @@
+name = "linex"
+main = "src/index.ts"
+compatibility_date = "2025-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Single-Worker 패턴 (Workers Static Assets):
+# - /api/* 는 Worker 가 처리 (Hono 라우팅)
+# - 그 외 경로는 frontend/dist 정적 자산. SPA 라우팅은 index.html 폴백.
+# 배포 전 `pnpm --filter frontend build` 로 dist 가 채워져 있어야 함.
+[assets]
+directory = "../frontend/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "linex-db"
+database_id = "8a9438c0-19c0-4f1c-ba2d-c5a35059be2f"
+migrations_dir = "drizzle"
+
+[observability]
+enabled = true
