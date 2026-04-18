@@ -37,47 +37,48 @@
 
 ## B. 데이터/인프라 (Phase 1 들어가기 전 결정)
 
-### B1. 사용자 모델
-현재 `users` 테이블이 스키마에 없음. 단일 사용자(본인만) 가정인지, 추후 멀티 유저로 갈지 결정 필요.
-- 단일 유저: `user_id` 컬럼 생략 가능, 인증은 단순 토큰
-- 멀티 유저: 처음부터 `user_id` FK 박아두는 편이 마이그레이션 비용 절감
+> **B1~B4 모두 결정 완료 (2026-04-18).** 결정 내용과 함의는 [`infra_model.md`](./infra_model.md) 참조.
 
-### B2. 인증 전략
-- Cloudflare Access (Zero Trust) / Workers 자체 JWT / 패스워드+세션 중 선택
-- Gemini API 키 등 시크릿 → Workers Secrets 로 관리한다는 점 명시
+### B1. 사용자 모델 — DECIDED
+- 단일 유저로 시작 + `user_id` FK 절충형 (모든 테이블에 FK 박아두고 default user_id=1)
 
-### B3. 마이그레이션 / ORM 도구
-- D1 마이그레이션: Wrangler `d1 migrations` vs Drizzle Kit
-- 쿼리 레이어: raw SQL / Kysely / Drizzle ORM
-- 프론트-백 타입 공유 전략 (단일 TS 모노레포? `pnpm` workspace?)
+### B2. 인증 전략 — DECIDED
+- Cloudflare Access (Zero Trust, 무료 플랜)
+- Gemini API 키: Workers Secrets, 프론트 노출 금지
 
-### B4. 오프라인 / 동기화 전략
-"KV 로 임시 캐싱" 만 적혀 있고 동기화 규칙이 없음.
-- 헬스장에서 오프라인 기록 → 온라인 복귀 시 충돌 해결 (last-write-wins / 사용자 선택)
-- 클라이언트 저장: IndexedDB(브라우저) vs KV(엣지) 역할 분담
-- Service Worker 캐싱 정책 (앱 셸 / API 응답)
+### B3. 마이그레이션 / ORM 도구 — DECIDED
+- Drizzle ORM + Drizzle Kit (D1 first-class)
+- pnpm workspace (`frontend/`, `backend/`, `shared/`)
+
+### B4. 오프라인 / 동기화 전략 — DECIDED
+- IndexedDB (`idb` 라이브러리), Last-Write-Wins
+- Service Worker: cache-first (앱 셸) / network-first (API) / SWR (카탈로그)
+- `vite-plugin-pwa` (Workbox wrapper)
 
 ---
 
 ## C. LLM 파이프라인 (Phase 2 핵심 리스크)
 
-### C1. 응답 스키마 검증
-- Gemini JSON 출력 → Zod (또는 valibot) 스키마로 강검증
-- 검증 실패 시 재시도/폴백 정책
+> **C2 결정 완료 + C1·C4 부분 결정 (2026-04-18).** 상세는 [`prompts_model.md`](./prompts_model.md). C3·C5 는 Phase 4 / 운영 단계 deferral.
 
-### C2. 프롬프트 관리
-- 프롬프트를 코드에 인라인 vs 별도 파일(`backend/prompts/*.md`)
-- 버전 관리: 프롬프트 변경 이력을 git 으로 추적 + 어떤 블럭이 어떤 프롬프트 버전으로 생성됐는지 DB 에 기록(`program_blocks.prompt_version`)
+### C1. 응답 스키마 검증 — PARTIAL
+- Zod 스키마 위치: `shared/validators/llm/{coach,realtime_adjust,analysis}_output.ts`
+- 재시도 / 폴백 정책 디테일은 Phase 2 시작 시 결정
 
-### C3. 컨텍스트 압축
-- "이전 블럭 성과" 를 매번 LLM 에 통째로 넘기면 토큰 폭증 → 요약 또는 집계 통계만 전달하는 규칙 정의
+### C2. 프롬프트 관리 — DECIDED
+- 외부 `.md` 파일 (`backend/prompts/*`) + frontmatter (id/version/description/input_vars/output_schema/model)
+- `{{var}}` 단순 치환, `coach_{linear,dup,block,conjugate}.md` + `coach_realtime_adjust.md` + `analysis_insights.md`
+- DB 에 `prompt_version` (정수) + `prompt_hash` (sha256) 두 컬럼 기록
 
-### C4. 모델 선택
-- `Gemini 1.5 Flash` 를 명시했는데, 2026-04 시점 더 최신 Gemini 라인업이 있을 수 있음 → "Flash 계열 최신" 으로 표현하고 모델 ID 는 환경변수화
+### C3. 컨텍스트 압축 — TODO (Phase 4)
+- 첫 블럭: 사용자 입력만. 두 번째 이후: 직전 블럭 raw 데이터 통째 전달 (한도 내)
 
-### C5. 비용/레이트 제한
-- Gemini 무료 티어 한도 / 일일 호출 상한
-- 코치 모드(블럭당 1회) vs 훈련 모드(세션당 N회) 의 비용 차이 인지
+### C4. 모델 선택 — PARTIAL
+- `GEMINI_MODEL` env 외부화 결정. frontmatter `model` 은 default
+- 정확한 모델 ID 는 Phase 2 진입 시점에 Google 공식 문서 확인 후 확정
+
+### C5. 비용/레이트 제한 — TODO (운영 단계)
+- 호출 카운터 hook 만 미리 마련. 일일 한도 / 알림 정책은 운영 시 결정
 
 ---
 
@@ -97,41 +98,42 @@
 
 ## E. 운영/품질
 
-### E1. 테스트 전략
-- 백엔드: Vitest + Miniflare(Workers) + D1 local
-- 프론트: 컴포넌트 테스트 / Playwright E2E
-- LLM 응답 스키마 검증은 픽스처 기반 회귀 테스트
+> **E1, E2 결정 완료 (2026-04-18).** 상세는 [`infra_model.md`](./infra_model.md) §7. E3, E4 는 Phase 1 init / 운영 단계에서 결정.
 
-### E2. CI/CD
-- GitHub Actions: lint → test → wrangler deploy
-- PR 단위 Cloudflare Pages preview deploy
+### E1. 테스트 전략 — DECIDED
+- 백엔드: Vitest + Miniflare + D1 local
+- 프론트 단위: Vitest + Testing Library
+- E2E: Playwright
+- 린터/포매터: Biome
 
-### E3. 로컬 개발 환경
-- `wrangler dev` + D1 local + KV local 셋업 절차
-- `frontend/`, `backend/` 동시 실행 방법 (Turborepo / pnpm scripts)
+### E2. CI/CD — DECIDED
+- GitHub Actions (lint → test → wrangler deploy)
+- Cloudflare Pages preview 는 git 연동으로 자동
 
-### E4. 모니터링/백업
+### E3. 로컬 개발 환경 — TODO (Phase 1 init 시)
+- `wrangler dev` + D1 local 셋업 절차
+- `pnpm` workspace scripts (`pnpm dev` 가 frontend + backend 동시 실행)
+
+### E4. 모니터링/백업 — TODO (운영 단계)
 - Workers Logs / Logpush 활용 여부
-- D1 정기 export → R2 백업 (단일 명령으로 가능한 수준)
+- D1 정기 export → R2 백업
 
 ---
 
-## F. 로드맵 보강
+## F. 로드맵 보강 — DECIDED
 
-각 Phase 에 **완료 기준 (Done definition)** 을 1줄씩 추가하면 진행도 측정이 쉬움. 예:
-
-- Phase 1 Done: `wrangler d1 execute` 로 4개 테이블 생성, 시드 운동 10종 적재, `SELECT * FROM exercises` 가 로컬·원격 양쪽 OK
-- Phase 2 Done: 입력 폼 → Gemini 호출 → JSON 검증 통과 → `program_sets` 적재까지 한 번의 API 호출로 완결
-- Phase 3 Done: 모바일 PWA 로 체크인/세트 기록/완료까지 오프라인 포함 동작
-- Phase 4 Done: 분석 화면에서 최소 3종 인사이트 카드 자동 생성, 챗봇으로 당일 중량 조정 1회 시연
-
-또한 **Phase 0 (선결)** 을 추가 권장:
-- 도메인 모델(A 섹션) 합의 + `docs/` 에 운동 사전 / 주기화 모델 / 1RM 공식 문서화
+> Phase 0 (사전 결정) ~ Phase 4 (AI 고도화) 의 Done definition 체크리스트 + 검증 방법은 [`roadmap.md`](./roadmap.md) 참조.
+>
+> 현재 상태: Phase 0 ✅ 완료. Phase 1 진입 대기.
 
 ---
 
 ## 권장 다음 행동
 
-1. A 섹션(도메인 모델)을 먼저 결정 → `total_plan.md` 갱신
-2. B/C 섹션은 Phase 1 / Phase 2 직전에 결정해도 됨
-3. D/E/F 는 해당 Phase 진입 시점에 보강
+1. ✅ A 섹션 결정 → `domain_model.md` + `docs/`
+2. ✅ B 섹션 결정 → `infra_model.md`
+3. ✅ C2 결정 → `prompts_model.md`
+4. ✅ F 결정 → `roadmap.md`
+5. ⏳ **Phase 1 init 시작** — pnpm workspace + wrangler + Drizzle 셋업
+6. ⏳ Phase 2 진입 시 C1·C4 잔여 결정 (Gemini 모델 ID 확정, 재시도 정책)
+7. ⏳ Phase 4 진입 시 D 섹션 결정 (분석 방법, 인사이트 트리거)
