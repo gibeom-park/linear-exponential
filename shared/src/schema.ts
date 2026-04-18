@@ -10,7 +10,6 @@ import {
   EXERCISE_KIND,
   MUSCLE_GROUP,
   PARENT_LIFT,
-  PROGRAM_TYPE,
   UNIT_SYSTEM,
 } from './enums.ts';
 
@@ -60,28 +59,27 @@ export const exercises = sqliteTable(
   }),
 );
 
-// ---------- program_blocks (LLM 으로 생성된 한 사이클) ----------
+// ---------- program_blocks (수동 코치 모드로 만든 한 사이클) ----------
 
 export const programBlocks = sqliteTable('program_blocks', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   userId: integer('user_id')
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
-  programType: text('program_type', { enum: PROGRAM_TYPE }).notNull(),
   weeks: integer('weeks').notNull(),
   daysPerWeek: integer('days_per_week').notNull(),
+  // 사용자가 선택한 요일 — JSON 문자열, 예) ["mon","wed","fri"]. 길이 = daysPerWeek
+  selectedDays: text('selected_days').notNull(),
+  // 시작/종료일 (ISO YYYY-MM-DD). endDate = startDate + weeks*7 - 1
+  startDate: text('start_date').notNull(),
+  endDate: text('end_date').notNull(),
   // 1RM 입력 (kg canonical)
   squat1rmKg: real('squat_1rm_kg').notNull(),
   bench1rmKg: real('bench_1rm_kg').notNull(),
   deadlift1rmKg: real('deadlift_1rm_kg').notNull(),
-  // 메타
-  startedAt: text('started_at'),
-  endedAt: text('ended_at'),
+  deadliftStance: text('deadlift_stance', { enum: DEADLIFT_STANCE }).notNull(),
+  notes: text('notes'),
   isActive: integer('is_active', { mode: 'boolean' }).notNull().default(false),
-  // LLM 추적 (prompts_model.md §4)
-  promptVersion: integer('prompt_version').notNull(),
-  promptHash: text('prompt_hash').notNull(),
-  rawPlan: text('raw_plan', { mode: 'json' }),
   ...timestamps,
 });
 

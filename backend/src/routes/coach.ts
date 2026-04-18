@@ -3,160 +3,27 @@ import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 
 import { exercises, programBlocks, programSets } from '@linex/shared/schema';
-import { generateBlockInputSchema, saveBlockInputSchema } from '@linex/shared/validators/api/coach';
-import { llmCoachOutputSchema } from '@linex/shared/validators/llm/coach_output';
+import {
+  createBlockInputSchema,
+  patchWeekInputSchema,
+} from '@linex/shared/validators/api/coach';
 
-import { PROMPTS, type PromptId } from '../../prompts/generated.ts';
-import { hashPrompt, parsePrompt, render } from '../../prompts/lib/render.ts';
 import { createDb } from '../lib/db.ts';
-import { GeminiError, callGeminiJson, resolveModel } from '../lib/gemini.ts';
 import type { AppBindings } from '../types.ts';
 
 // 단일 유저 가정 — infra_model.md §1
 const USER_ID = 1;
 
-const PROGRAM_TYPE_TO_PROMPT: Record<string, PromptId> = {
-  linear: 'coach_linear',
-  dup: 'coach_dup',
-  block: 'coach_block',
-  conjugate: 'coach_conjugate',
-};
+// D1 = SQLite, 한 쿼리당 100 변수 제한. program_sets row 당 8 컬럼 → 12 row 씩 청크.
+const SETS_INSERT_CHUNK = 12;
 
-function resolvePrompt(programType: string) {
-  const promptId = PROGRAM_TYPE_TO_PROMPT[programType];
-  const promptText = promptId ? PROMPTS[promptId] : undefined;
-  if (!promptId || !promptText) return null;
-  return parsePrompt(promptText);
+function computeEndDate(startDateIso: string, weeks: number): string {
+  const start = new Date(`${startDateIso}T00:00:00Z`);
+  start.setUTCDate(start.getUTCDate() + weeks * 7 - 1);
+  return start.toISOString().slice(0, 10);
 }
 
 export const coachRoute = new Hono<AppBindings>()
-  // LLM 으로 plan 제안만 받음 (DB 미저장). 사용자 카드 편집을 위한 1단계.
-  .post('/preview', zValidator('json', generateBlockInputSchema), async (c) => {
-    const input = c.req.valid('json');
-    const apiKey = c.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return c.json({ error: 'GEMINI_API_KEY 미설정' }, 500);
-    }
-
-    const file = resolvePrompt(input.programType);
-    if (!file) {
-      return c.json({ error: `unknown programType: ${input.programType}` }, 400);
-    }
-
-    const rendered = render(file, {
-      weeks: input.weeks,
-      days_per_week: input.daysPerWeek,
-      squat_1rm: input.squat1rmKg,
-      bench_1rm: input.bench1rmKg,
-      deadlift_1rm: input.deadlift1rmKg,
-      deadlift_stance: input.deadliftStance,
-      weak_points: input.weakPoints?.trim() || '없음',
-    });
-
-    const model = resolveModel(c.env.GEMINI_MODEL, file.metadata.model);
-
-    let raw: unknown;
-    try {
-      raw = await callGeminiJson({
-        apiKey,
-        model,
-        systemPrompt: rendered.system,
-        userPrompt: rendered.user,
-      });
-    } catch (err) {
-      const msg = err instanceof GeminiError ? err.message : 'gemini 실패';
-      return c.json({ error: 'gemini_call_failed', detail: msg }, 502);
-    }
-
-    const parsed = llmCoachOutputSchema.safeParse(raw);
-    if (!parsed.success) {
-      return c.json({ error: 'llm_output_invalid', detail: parsed.error.flatten() }, 502);
-    }
-
-    return c.json({ plan: parsed.data, model, prompt_version: file.metadata.version });
-  })
-  // 사용자가 카드에서 편집한 plan 을 저장. 활성 블럭 토글.
-  .post('/blocks', zValidator('json', saveBlockInputSchema), async (c) => {
-    const { input, plan } = c.req.valid('json');
-
-    const file = resolvePrompt(input.programType);
-    if (!file) {
-      return c.json({ error: `unknown programType: ${input.programType}` }, 400);
-    }
-    const promptHash = await hashPrompt(file);
-
-    const db = createDb(c.env.DB);
-    const catalog = await db.select({ id: exercises.id, name: exercises.name }).from(exercises);
-    const nameToId = new Map(catalog.map((e) => [e.name, e.id]));
-
-    await db
-      .update(programBlocks)
-      .set({ isActive: false })
-      .where(and(eq(programBlocks.userId, USER_ID), eq(programBlocks.isActive, true)));
-
-    const inserted = await db
-      .insert(programBlocks)
-      .values({
-        userId: USER_ID,
-        programType: input.programType,
-        weeks: input.weeks,
-        daysPerWeek: input.daysPerWeek,
-        squat1rmKg: input.squat1rmKg,
-        bench1rmKg: input.bench1rmKg,
-        deadlift1rmKg: input.deadlift1rmKg,
-        isActive: true,
-        promptVersion: file.metadata.version,
-        promptHash,
-        rawPlan: plan,
-      })
-      .returning({ id: programBlocks.id });
-
-    const blockId = inserted[0]?.id;
-    if (blockId === undefined) {
-      return c.json({ error: 'insert_failed' }, 500);
-    }
-
-    const setRows: (typeof programSets.$inferInsert)[] = [];
-    const unknownExercises = new Set<string>();
-    for (const week of plan.weeks) {
-      for (const day of week.days) {
-        for (const ex of day.exercises) {
-          const exerciseId = nameToId.get(ex.name);
-          if (exerciseId === undefined) {
-            unknownExercises.add(ex.name);
-            continue;
-          }
-          for (const set of ex.sets) {
-            setRows.push({
-              blockId,
-              weekNo: week.week_no,
-              dayNo: day.day_no,
-              exerciseId,
-              setNo: set.set_no,
-              plannedReps: set.reps,
-              plannedWeightKg: set.weight_kg,
-              plannedRpe: set.rpe ?? null,
-            });
-          }
-        }
-      }
-    }
-
-    if (setRows.length > 0) {
-      // D1 = SQLite, 한 쿼리당 100 변수 제한. row 당 8 필드 → 12 row 씩 끊는다.
-      const CHUNK = 12;
-      for (let i = 0; i < setRows.length; i += CHUNK) {
-        await db.insert(programSets).values(setRows.slice(i, i + CHUNK));
-      }
-    }
-
-    return c.json({
-      block_id: blockId,
-      sets_inserted: setRows.length,
-      unknown_exercises: [...unknownExercises],
-    });
-  })
-  // 운동 카탈로그 — 카드 편집 시 운동 추가 드롭다운에 사용
   .get('/exercises', async (c) => {
     const db = createDb(c.env.DB);
     const list = await db
@@ -169,6 +36,82 @@ export const coachRoute = new Hono<AppBindings>()
       })
       .from(exercises);
     return c.json({ exercises: list });
+  })
+  // 수동 코치 모드: Step 1 (블럭 파라미터) + Step 2 (주 1 템플릿) → DB 적재
+  // 백엔드가 주 1 을 weeks 만큼 복제해서 program_sets 일괄 insert.
+  .post('/blocks', zValidator('json', createBlockInputSchema), async (c) => {
+    const input = c.req.valid('json');
+    const db = createDb(c.env.DB);
+
+    const exerciseIds = new Set(input.week1.flatMap((d) => d.exercises.map((e) => e.exerciseId)));
+    if (exerciseIds.size > 0) {
+      const found = await db
+        .select({ id: exercises.id })
+        .from(exercises);
+      const known = new Set(found.map((e) => e.id));
+      const missing = [...exerciseIds].filter((id) => !known.has(id));
+      if (missing.length > 0) {
+        return c.json({ error: 'unknown_exercise_ids', missing }, 400);
+      }
+    }
+
+    const endDate = computeEndDate(input.startDate, input.weeks);
+
+    await db
+      .update(programBlocks)
+      .set({ isActive: false })
+      .where(and(eq(programBlocks.userId, USER_ID), eq(programBlocks.isActive, true)));
+
+    const inserted = await db
+      .insert(programBlocks)
+      .values({
+        userId: USER_ID,
+        weeks: input.weeks,
+        daysPerWeek: input.daysPerWeek,
+        selectedDays: JSON.stringify(input.selectedDays),
+        startDate: input.startDate,
+        endDate,
+        squat1rmKg: input.squat1rmKg,
+        bench1rmKg: input.bench1rmKg,
+        deadlift1rmKg: input.deadlift1rmKg,
+        deadliftStance: input.deadliftStance,
+        notes: input.notes ?? null,
+        isActive: true,
+      })
+      .returning({ id: programBlocks.id });
+
+    const blockId = inserted[0]?.id;
+    if (blockId === undefined) {
+      return c.json({ error: 'insert_failed' }, 500);
+    }
+
+    const setRows: (typeof programSets.$inferInsert)[] = [];
+    for (let weekNo = 1; weekNo <= input.weeks; weekNo++) {
+      for (const day of input.week1) {
+        for (const ex of day.exercises) {
+          for (const set of ex.sets) {
+            setRows.push({
+              blockId,
+              weekNo,
+              dayNo: day.dayNo,
+              exerciseId: ex.exerciseId,
+              setNo: set.setNo,
+              plannedReps: set.reps,
+              plannedWeightKg: set.weightKg,
+              plannedRpe: set.rpe ?? null,
+            });
+          }
+        }
+      }
+    }
+
+    if (setRows.length > 0) {
+      for (let i = 0; i < setRows.length; i += SETS_INSERT_CHUNK) {
+        await db.insert(programSets).values(setRows.slice(i, i + SETS_INSERT_CHUNK));
+      }
+    }
+
+    return c.json({ block_id: blockId, sets_inserted: setRows.length, end_date: endDate });
   })
   .get('/blocks/:id', async (c) => {
     const id = Number(c.req.param('id'));
@@ -197,4 +140,68 @@ export const coachRoute = new Hono<AppBindings>()
       .where(eq(programSets.blockId, id));
 
     return c.json({ block, sets });
+  })
+  // 특정 주 sets 통째 교체. 주 단위 편집용.
+  .patch('/blocks/:id/week/:weekNo', zValidator('json', patchWeekInputSchema), async (c) => {
+    const id = Number(c.req.param('id'));
+    const weekNo = Number(c.req.param('weekNo'));
+    if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(weekNo) || weekNo <= 0) {
+      return c.json({ error: 'invalid_id' }, 400);
+    }
+
+    const { days } = c.req.valid('json');
+    const db = createDb(c.env.DB);
+
+    const block = await db.select().from(programBlocks).where(eq(programBlocks.id, id)).get();
+    if (!block || block.userId !== USER_ID) {
+      return c.json({ error: 'not_found' }, 404);
+    }
+    if (weekNo > block.weeks) {
+      return c.json({ error: 'week_out_of_range' }, 400);
+    }
+
+    const exerciseIds = new Set(days.flatMap((d) => d.exercises.map((e) => e.exerciseId)));
+    if (exerciseIds.size > 0) {
+      const found = await db.select({ id: exercises.id }).from(exercises);
+      const known = new Set(found.map((e) => e.id));
+      const missing = [...exerciseIds].filter((eid) => !known.has(eid));
+      if (missing.length > 0) {
+        return c.json({ error: 'unknown_exercise_ids', missing }, 400);
+      }
+    }
+
+    const dayNoSet = new Set(days.map((d) => d.dayNo));
+    if (dayNoSet.size !== days.length || [...dayNoSet].some((n) => n < 1 || n > block.daysPerWeek)) {
+      return c.json({ error: 'invalid_day_no' }, 400);
+    }
+
+    await db
+      .delete(programSets)
+      .where(and(eq(programSets.blockId, id), eq(programSets.weekNo, weekNo)));
+
+    const setRows: (typeof programSets.$inferInsert)[] = [];
+    for (const day of days) {
+      for (const ex of day.exercises) {
+        for (const set of ex.sets) {
+          setRows.push({
+            blockId: id,
+            weekNo,
+            dayNo: day.dayNo,
+            exerciseId: ex.exerciseId,
+            setNo: set.setNo,
+            plannedReps: set.reps,
+            plannedWeightKg: set.weightKg,
+            plannedRpe: set.rpe ?? null,
+          });
+        }
+      }
+    }
+
+    if (setRows.length > 0) {
+      for (let i = 0; i < setRows.length; i += SETS_INSERT_CHUNK) {
+        await db.insert(programSets).values(setRows.slice(i, i + SETS_INSERT_CHUNK));
+      }
+    }
+
+    return c.json({ block_id: id, week_no: weekNo, sets_replaced: setRows.length });
   });

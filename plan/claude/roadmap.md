@@ -2,9 +2,9 @@
 
 `total_plan.md` §5 의 Phase 1~4 에 완료 기준을 추가하고 Phase 0 (사전 결정) 을 명시. 각 Phase 가 끝났는지 확인 가능한 체크리스트 + 검증 명령을 함께 둠.
 
-마지막 갱신: 2026-04-18.
+마지막 갱신: 2026-04-18 — Phase 2 를 수동 코치 모드로 재구성. AI 통합(Gemini) 은 Post-MVP 로 이동. 이전 LLM 기반 설계는 [`archive/prompts_model.md`](./archive/prompts_model.md) 에 보존.
 
-관련: [`domain_model.md`](./domain_model.md), [`infra_model.md`](./infra_model.md), [`prompts_model.md`](./prompts_model.md), [`total_plan_suggestions.md`](./total_plan_suggestions.md)
+관련: [`domain_model.md`](./domain_model.md), [`infra_model.md`](./infra_model.md), [`total_plan_suggestions.md`](./total_plan_suggestions.md)
 
 ---
 
@@ -16,8 +16,7 @@
 - 도메인 결정: A1~A4 + 후속 6건 모두 해결 → `domain_model.md`
 - 도메인 자료 작성: `docs/exercises_seed.md`, `docs/e1rm_formulas.md`, `docs/periodization_models.md`
 - 인프라 결정: B1~B4 + 프론트/백/공통 스택 → `infra_model.md`
-- LLM 프롬프트 구조: C2 결정 → `prompts_model.md`
-- 결정 트래커 `total_plan_suggestions.md` 의 A / B / C2 / E1·E2 모두 DECIDED
+- 결정 트래커 `total_plan_suggestions.md` 의 A / B / E1·E2 DECIDED. C / D 섹션은 AI 도입 시점까지 DEFERRED
 
 ---
 
@@ -58,23 +57,38 @@ pnpm dev
 
 ---
 
-## Phase 2 — 코치 모드 MVP
+## Phase 2 — 코치 모드 MVP (수동 빌더)
 
-**상태: ⏳ Phase 1 완료 후**
+**상태: 🚧 진행 중 — 1차 (LLM 기반) 완료 후 수동 빌더로 재구성**
+
+> 1차안은 Gemini 기반 블럭 생성이었으나 (a) Workers KR PoP 의 Gemini geo-restriction, (b) 어차피 LLM 결과를 수정하는 사용 패턴, (c) "코치가 직접 짠다" 는 본래 의도와의 정합성을 이유로 **수동 빌더** 로 전환. AI 통합은 Post-MVP 로 이동.
 
 ### Done definition
-- [ ] `backend/prompts/coach_{linear,dup,block,conjugate}.md` 4개 작성 (frontmatter + System/User 섹션)
-- [ ] `backend/prompts/lib/render.ts` 구현 + 단위 테스트 (`{{var}}` 치환 + 누락 검증)
-- [ ] `shared/validators/llm/coach_output.ts` Zod 스키마 (block/week/day/exercise/set 계층)
-- [ ] `backend/src/lib/gemini.ts` 클라이언트 래퍼 (env `GEMINI_MODEL` 우선, frontmatter default)
-- [ ] `POST /api/coach/generate-block`: 입력 검증 → 프롬프트 렌더 → Gemini 호출 → Zod 검증 (1회 재시도) → DB 적재
-- [ ] `program_blocks` row 에 `prompt_version` (frontmatter) + `prompt_hash` (sha256) 기록
-- [ ] `GET /api/coach/blocks/:id` 조회 동작
-- [ ] 프론트 코치 모드 화면: 4개 프로그램 카드 + 블럭 길이/주당 일수/1RM/데드 스탠스 입력 폼 → 결과 미리보기 (week × day 표)
+- [x] `program_blocks` 스키마 재정의: `selected_days` (JSON), `start_date` / `end_date` (ISO), `notes`. `program_type` / `prompt_version` / `prompt_hash` / `raw_plan` 제거
+- [x] `dayOfWeek` enum 추가 (`mon`/.../`sun`), `programType` enum 제거
+- [x] 마이그레이션 `0001_manual_coach.sql` 적용 (DROP + CREATE)
+- [x] `shared/validators/api/coach.ts` 재작성 (수동 입력 + cross-field 검증: selectedDays.length === daysPerWeek, dayNo 범위·중복)
+- [x] `POST /api/coach/blocks`: 수동 입력 검증 → 활성 블럭 deactivate → block 1행 + 주 1 템플릿을 weeks 만큼 복제 → `program_sets` 일괄 insert (D1 100-var 청크 = 12 row)
+- [x] `PATCH /api/coach/blocks/:id/week/:weekNo`: 해당 주 sets 통째 교체 (delete + insert)
+- [x] `GET /api/coach/blocks/:id`: 블럭 + sets 조회
+- [x] 프론트 `/coach`: 2-step (블럭 파라미터 → 주 1 템플릿 빌드 → 저장)
+  - Step 1: weeks / 요일 체크박스 / shadcn Calendar Popover (startDate, endDate 자동 표시) / 1RM / 데드 스탠스 / 메모
+  - Step 2: 선택한 요일 수만큼 day 카드 그리드. 카테고리 단계 드롭다운 (kind → parent_lift / muscle_group → exercise). 세트 행 (reps / kg / RPE).
+- [x] 프론트 `/coach/blocks/:id`: 주별 편집 화면 (주 선택 탭 + Step 2 동일 UI + 주 단위 PATCH)
+- [x] LLM 관련 코드 제거: `backend/src/lib/gemini.ts`, `backend/prompts/`, `backend/scripts/build-prompts.mjs`, `shared/src/validators/llm/`, `GEMINI_*` env / scripts
+- [x] `prompts_model.md` → `archive/prompts_model.md` 로 이동 (AI 재도입 시 참고)
+- [ ] 로컬 E2E 시연 (시작일 → 자동 종료일, 6주 복제 적재, 주 3 무게만 수정 후 유지 확인)
 
 ### Verification
-- 프론트에서 linear 프로그램 1개 생성 → DB 의 `program_blocks` 1행 + `program_sets` (weeks × days_per_week × N) 행 적재 → 미리보기에서 계층 확인
-- DUP / Block / Conjugate 도 같은 흐름으로 1회씩 생성 성공
+- 단위: `pnpm --filter backend test` (입력 검증 / 활성 토글 / sets 청크 / patch week / 404·400)
+- 로컬: `pnpm dev` → `/coach` 진입 → 6주/주3회/Mon-Wed-Fri/오늘 startDate → 저장 → `/coach/blocks/:id` 자동 이동 → 6주 모두 동일 sets 표시 → 주 3 만 수정 → 새로고침 후 유지 확인
+- DB:
+  ```
+  wrangler d1 execute linex-db --local \
+    --command "SELECT week_no, day_no, set_no, planned_weight_kg \
+               FROM program_sets WHERE block_id=1 \
+               ORDER BY week_no, day_no, set_no"
+  ```
 
 ---
 
@@ -98,34 +112,21 @@ pnpm dev
 
 ---
 
-## Phase 4 — AI 고도화
+## Post-MVP — AI 도입 / 고도화 (DEFERRED)
 
-**상태: ⏳ Phase 3 완료 후**
+**상태: ⏸ 보류** — Workers KR PoP 의 Gemini geo-restriction + 우회 인프라 비용 + 사용 패턴(어차피 수정) 을 이유로 무기한 보류. 재도입 시 [`archive/prompts_model.md`](./archive/prompts_model.md) 의 1차 설계를 출발점으로 사용.
 
-### Done definition
-- [ ] `backend/prompts/coach_realtime_adjust.md` 프롬프트 작성
-- [ ] `POST /api/train/realtime-adjust`: 현재 세션 컨텍스트 + 변경 사유 → 새 계획 무게 + 한 줄 코멘트
-- [ ] 훈련 화면 ±10% 초과 시도 → "코치에게 다시 물어보기" 버튼 → 위 API 호출 → 계획 무게 갱신
-- [ ] D 섹션 결정 (D1 표현 정정, D2 분석 방법, D3 인사이트 트리거)
-- [ ] `backend/prompts/analysis_insights.md` 프롬프트
-- [ ] `GET /api/analysis/insights?block_id=...`: training_logs + user_conditions 교차 분석 → 인사이트 카드 N종
-- [ ] 분석 화면: e1RM 시계열 (Recharts) + 인사이트 카드 최소 3종 자동 표시
-- [ ] 블럭 종료 시점에 분석 갱신 trigger (수동 버튼 + 자동 둘 다 가능)
+### 잠재적 작업 항목
+- AI 우회 인프라 결정 (AI Gateway / Vertex AI / 다른 region 의 Worker / Edge proxy)
+- 코치 모드 LLM 보조: 수동 빌더 위에 "초안 자동 생성" 옵션을 얹는 형태로 구상
+- 실시간 중량 조절: 훈련 화면 ±10% 초과 시 LLM 호출 → 계획 무게 갱신
+- 분석 인사이트: training_logs + user_conditions 교차 분석 → 인사이트 카드 (D 섹션)
 
-### Verification
-- 한 블럭 완료 → 분석 화면 진입 → e1RM 추세 + 인사이트 카드 3종 표시
-- 훈련 중 무게 ±15% 변경 시도 → 챗봇 호출 → 새 계획 무게 반영 1회 시연
-
----
-
-## Post-MVP (Phase 5+, 현재 미정)
-
-다음 결정 트리거가 있을 때 진행:
+### 그 외 Post-MVP 후보
 - 멀티 유저 전환 (B1 → 인증/회원가입 흐름)
 - 추가 주기화 모델 (5/3/1, GZCL 등)
 - 분석 인사이트 푸시/이메일 알림
 - D1 → R2 백업 자동화 (B Open Questions)
-- LLM 호출 비용 모니터링 (C5)
 - 음성 입력 / 자동 동기화 등 UX 개선
 
 ---

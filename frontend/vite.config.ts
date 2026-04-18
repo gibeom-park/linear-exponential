@@ -43,10 +43,17 @@ export default defineConfig({
     }),
   ],
   resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-      '@linex/shared': path.resolve(__dirname, '../shared/src/index.ts'),
-    },
+    alias: [
+      { find: '@/', replacement: `${path.resolve(__dirname, './src')}/` },
+      {
+        find: /^@linex\/shared\/(.+)$/,
+        replacement: `${path.resolve(__dirname, '../shared/src')}/$1.ts`,
+      },
+      {
+        find: /^@linex\/shared$/,
+        replacement: path.resolve(__dirname, '../shared/src/index.ts'),
+      },
+    ],
   },
   server: {
     port: 5173,

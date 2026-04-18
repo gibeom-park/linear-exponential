@@ -109,23 +109,3 @@
 | 회복 관리 난이도 | 낮음 | 높음 | 중간 | 높음 |
 | 시합 피크 적합도 | 중간 | 낮음 | 매우 높음 | 낮음 |
 | 변형 운동 풀 필요량 | 작음 | 작음 | 중간 | 매우 큼 |
-| LLM 프롬프팅 난이도 | 쉬움 | 중간 | 중간 | 어려움 |
-
----
-
-## 프롬프트 작성 가이드
-
-각 프로그램별 LLM 프롬프트(`backend/prompts/coach_{program_type}.md`) 작성 시 공통 입력:
-- 사용자 1RM (SBD 각각, kg)
-- 블럭 길이 (`weeks`)
-- 주당 일수 (`days_per_week`)
-- 메인 데드리프트 스탠스 (conv / sumo)
-- 사용자 약점 메모 (선택)
-
-프로그램별 특화 입력:
-- **Linear**: 목표 1RM 증가 폭 (예: +5kg)
-- **DUP**: 주당 strength/hypertrophy/peaking 비율
-- **Block**: 시합일 (있다면) → 역산해 블럭 길이 자동 분배
-- **Conjugate**: ME 변형 풀, DE 밴드/체인 가용 여부
-
-출력 JSON 스키마는 모두 동일: `program_sets` 테이블 적재 가능한 형태 (block_id / week_no / day_no / exercise_id / set_no / planned_reps / planned_weight_kg).

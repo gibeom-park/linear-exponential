@@ -57,42 +57,25 @@
 
 ---
 
-## C. LLM 파이프라인 (Phase 2 핵심 리스크)
+## C. LLM 파이프라인 — DEFERRED (Post-MVP)
 
-> **C2 결정 완료 + C1·C4 부분 결정 (2026-04-18).** 상세는 [`prompts_model.md`](./prompts_model.md). C3·C5 는 Phase 4 / 운영 단계 deferral.
+> Phase 2 가 수동 코치 모드로 재구성되며 C 섹션 전체를 Post-MVP 로 이동. 1차 설계는 [`archive/prompts_model.md`](./archive/prompts_model.md) 에 보존. AI 재도입 시 출발점.
 
-### C1. 응답 스키마 검증 — PARTIAL
-- Zod 스키마 위치: `shared/validators/llm/{coach,realtime_adjust,analysis}_output.ts`
-- 재시도 / 폴백 정책 디테일은 Phase 2 시작 시 결정
-
-### C2. 프롬프트 관리 — DECIDED
-- 외부 `.md` 파일 (`backend/prompts/*`) + frontmatter (id/version/description/input_vars/output_schema/model)
-- `{{var}}` 단순 치환, `coach_{linear,dup,block,conjugate}.md` + `coach_realtime_adjust.md` + `analysis_insights.md`
-- DB 에 `prompt_version` (정수) + `prompt_hash` (sha256) 두 컬럼 기록
-
-### C3. 컨텍스트 압축 — TODO (Phase 4)
-- 첫 블럭: 사용자 입력만. 두 번째 이후: 직전 블럭 raw 데이터 통째 전달 (한도 내)
-
-### C4. 모델 선택 — PARTIAL
-- `GEMINI_MODEL` env 외부화 결정. frontmatter `model` 은 default
-- 정확한 모델 ID 는 Phase 2 진입 시점에 Google 공식 문서 확인 후 확정
-
-### C5. 비용/레이트 제한 — TODO (운영 단계)
-- 호출 카운터 hook 만 미리 마련. 일일 한도 / 알림 정책은 운영 시 결정
+### C1. 응답 스키마 검증 — DEFERRED
+### C2. 프롬프트 관리 — DEFERRED (1차안 archive 보존)
+### C3. 컨텍스트 압축 — DEFERRED
+### C4. 모델 선택 — DEFERRED (KR PoP geo-restriction 우회 인프라와 함께 결정)
+### C5. 비용/레이트 제한 — DEFERRED
 
 ---
 
-## D. 분석 모드 구체화
+## D. 분석 모드 구체화 — DEFERRED (Post-MVP)
 
-### D1. "인과관계" 표현 재검토
-본문에 "인과관계 분석" 이라고 적었지만 관측 데이터로 도출 가능한 건 **상관관계**. 표현을 "상관 분석 / 패턴 탐색" 으로 정정 권장.
+> LLM 인사이트 카드 흐름은 C 섹션과 함께 보류. 단순 집계 / 시계열 차트는 LLM 없이도 가능하므로 Phase 3 이후 별도 검토.
 
-### D2. 분석 방법
-- 단순 집계(평균/실패율) vs 시계열 차트 vs 회귀
-- 시각화 라이브러리 (Recharts / visx / Chart.js) 결정
-
-### D3. 인사이트 트리거
-- 자동 생성 인사이트의 임계 조건 정의 (예: "수면 N 시간 미만 세션의 실패율이 전체 평균의 X% 초과 시 경고")
+### D1. "인과관계" → "상관관계" 표현 재검토 — DEFERRED
+### D2. 분석 방법 (집계 / 차트 / 회귀) — DEFERRED
+### D3. 인사이트 트리거 — DEFERRED
 
 ---
 
@@ -132,8 +115,9 @@
 
 1. ✅ A 섹션 결정 → `domain_model.md` + `docs/`
 2. ✅ B 섹션 결정 → `infra_model.md`
-3. ✅ C2 결정 → `prompts_model.md`
+3. ⏸ C2 (1차안) → `archive/prompts_model.md` 로 이동. AI 재도입 시 재검토
 4. ✅ F 결정 → `roadmap.md`
-5. ⏳ **Phase 1 init 시작** — pnpm workspace + wrangler + Drizzle 셋업
-6. ⏳ Phase 2 진입 시 C1·C4 잔여 결정 (Gemini 모델 ID 확정, 재시도 정책)
-7. ⏳ Phase 4 진입 시 D 섹션 결정 (분석 방법, 인사이트 트리거)
+5. ✅ Phase 1 완료
+6. 🚧 **Phase 2 (수동 코치 모드) 진행 중** — `roadmap.md` Done definition 참조
+7. ⏳ Phase 3 (훈련 모드 MVP) 준비
+8. ⏸ Post-MVP: C / D 섹션 (AI 도입 + 인사이트), 멀티 유저, 백업 자동화

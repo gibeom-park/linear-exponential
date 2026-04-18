@@ -2,7 +2,7 @@
 
 `total_plan.md` 의 도메인 결정사항을 한 곳에 모은 문서. 후속 결정이 추가될 때마다 이 문서를 갱신.
 
-마지막 갱신: 2026-04-18 — A1~A4 1차 결정 + Open Questions 6건 해소 (단위, 변형/보조 출처, e1RM default, 저-일수 호환성, 무게 조정).
+마지막 갱신: 2026-04-18 — A1~A4 1차 결정 + Open Questions 6건 해소. **추가**: Phase 2 가 수동 코치 모드로 재구성되며 §2 (주기화 카탈로그) 는 미사용 / DEFERRED, §1 의 `program_type` / `prompt_version` 컬럼 제거, §6 의 ±10% 정책은 UI 가드로만 유지.
 
 ---
 
@@ -14,44 +14,32 @@
 - **기본값**: 4주, 주 4일
 - **계층**: `block → week → session(day) → exercise → set`
 
-### 데이터 함의
-- 신규 테이블 `program_blocks` 필요. 컬럼 후보:
-  - `id`, `created_at`
-  - `weeks` (3~8 CHECK)
-  - `days_per_week` (1~7 CHECK)
-  - `program_type` (FK → 2번 섹션 카탈로그)
-  - `formula_type` (FK → 3번 섹션 카탈로그)
-  - `prompt_version` (LLM 프롬프트 버전 기록 — 추후 C2 와 연결)
-- 기존 `program_sets` 에 추가 컬럼: `block_id`, `week_no` (1..weeks), `day_no` (1..days_per_week), `set_no`
+### 데이터 함의 (Phase 2 수동 코치 모드 반영)
+- `program_blocks` 컬럼:
+  - `id`, `user_id`, `created_at`, `updated_at`
+  - `weeks` (2~8)
+  - `days_per_week` (1~7)
+  - `selected_days` TEXT (JSON, 예: `["mon","wed","fri"]`)
+  - `start_date`, `end_date` (ISO `YYYY-MM-DD`. end_date = start_date + weeks*7 - 1, 서버 계산)
+  - `squat_1rm_kg` / `bench_1rm_kg` / `deadlift_1rm_kg`, `deadlift_stance`
+  - `notes` (선택)
+  - `is_active` (활성 블럭 토글)
+  - ❌ 제거됨: `program_type`, `prompt_version`, `prompt_hash`, `raw_plan`, `started_at`, `ended_at`
+- `program_sets`: `block_id`, `week_no`, `day_no` (1..days_per_week), `set_no`, `exercise_id`, `planned_reps`, `planned_weight_kg`, `planned_rpe`. `day_no` 는 `selected_days` 의 인덱스 + 1.
 
 ### UI 함의
-- 코치 모드 진입 시 블럭 생성 폼: 주수 슬라이더(3~8) + 주당 일수 슬라이더(1~7), 기본값 표시
-
-### 프롬프트 함의
-- LLM 입력에 `weeks`, `days_per_week` 를 명시적으로 전달
+- 코치 모드 진입 시 블럭 생성 폼:
+  1. weeks (2~8 입력) + 요일 체크박스 (선택 수 = 주 N 회) + 시작일 (Calendar Popover, 종료일 자동 표시) + 1RM 3종 + 데드 스탠스 + 메모
+  2. 선택 요일 수만큼 day 카드 그리드. 각 day 카드에 ExerciseCard + SetRow 들. 주 1 만 채우면 저장 시 weeks 만큼 자동 복제.
+  3. 블럭 상세에서 주 단위 수정 (해당 주 sets 통째 PATCH).
 
 ---
 
-## 2. 주기화 프로그램 (A2)
+## 2. 주기화 프로그램 (A2) — DEFERRED
 
-### 결정
-- **카탈로그 (4종)**: `linear` (기본) / `dup` / `block` / `conjugate`
-- 사용자가 코치 모드 진입 시 4개 중 선택
-- 각 프로그램 카드에 짧은 설명 표시
-
-### 데이터 함의
-- `program_blocks.program_type` 컬럼 (enum: linear/dup/block/conjugate)
-- 카탈로그 메타는 코드 상수 또는 별도 테이블 `programs(id, display_name, short_description, prompt_path)`
-  - 4종 고정이고 자주 안 바뀌므로 **코드 상수** 가 가벼움
-
-### 프롬프트 함의
-- 프롬프트 파일 위치: `backend/prompts/coach_{program_type}.md`
-  - `coach_linear.md`, `coach_dup.md`, `coach_block.md`, `coach_conjugate.md`
-- 공통 입력 schema 정의 + 프로그램별 프롬프트가 그 위에서 작성 규칙을 specialize
-
-### UI 함의
-- 4개 프로그램 카드 컴포넌트 (id, display_name, short_description, 선택 라디오)
-- 각 카드의 short_description 은 도메인 자료에서 끌어옴 → `docs/periodization_models.md` (1종당 2~3줄)
+> 1차안에서는 `linear` / `dup` / `block` / `conjugate` 카탈로그를 두고 LLM 프롬프트를 분기시킬 계획이었으나, Phase 2 가 수동 빌더로 재구성되며 **카탈로그 자체를 제거**. 코치(=사용자) 가 직접 주기화를 설계하므로 프로그램 타입 분기가 불필요.
+>
+> AI 도입을 다시 검토할 때 (Post-MVP) 카탈로그를 부활시킬지 그대로 폐기할지 함께 결정. `docs/periodization_models.md` 의 모델 설명은 사용자 학습 자료로 그대로 유효.
 
 ---
 
@@ -107,9 +95,12 @@
 3. 세트별 row: 계획 reps×weight 표시, 사용자는 수행 후 RPE 기입 + 필요 시 무게 ±10% 조정
 4. 세션 완료 버튼 → `training_logs` 일괄 저장
 
-### 프롬프트 함의
-- 코치 모드 LLM 에 SBD 메인 + 변형 + 보조 조합 규칙 전달 (예: "메인 1종 + 변형 1~2종 + 보조 1~3종을 한 세션에 배치")
-- 운동 카탈로그를 LLM 컨텍스트에 전달할 때 `kind` / `parent_lift` / `muscle_group` 메타데이터 포함
+### 운동 추가 UI (수동 빌더)
+- day 카드의 `+ 운동 추가` → 카테고리 단계 드롭다운:
+  1. **kind**: main / variation / accessory
+  2. (variation) **parent_lift**: squat / bench / deadlift  ·  (accessory) **muscle_group**: quad / posterior_chain / back / chest / shoulder / triceps / biceps / core
+  3. 필터된 **exercise** 선택 → ExerciseCard 추가
+- 같은 day 안에 이미 추가된 운동은 드롭다운에서 자동 제외
 
 ---
 
@@ -151,12 +142,7 @@
 
 ### UI 함의
 - 무게 입력 필드에 ±10% 가드 (90~110% 범위 외 입력 시 비활성화 또는 경고)
-- 초과 변경 시도 시 "코치에게 다시 물어보기" 버튼 노출 → 코치 모드의 실시간 조절 API 호출
-
-### 프롬프트 함의
-- 실시간 조절 API 는 별도 프롬프트 (`backend/prompts/coach_realtime_adjust.md`)
-- 입력: 현재 세션 컨텍스트, 사용자가 요청한 변경 사유, 계획 무게
-- 출력: 새 계획 무게 + 한 줄 코칭 코멘트
+- ±10% 초과 시도는 Post-MVP 의 "실시간 조절" (LLM) 흐름으로 대응 예정. 현 단계에서는 **UI 가드만** 두고, 초과 시 코치 모드로 돌아가 블럭을 직접 수정하도록 안내.
 
 ---
 

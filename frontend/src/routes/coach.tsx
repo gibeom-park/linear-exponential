@@ -1,49 +1,41 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Link, createRoute } from '@tanstack/react-router';
-import { useState } from 'react';
+import { Link, createRoute, useNavigate } from '@tanstack/react-router';
+import { useMemo, useState } from 'react';
 
-import type { ProgramType } from '@linex/shared/enums';
-import type { GenerateBlockInput } from '@linex/shared/validators/api/coach';
-import type { LlmCoachOutput } from '@linex/shared/validators/llm/coach_output';
+import type { CreateBlockInput } from '@linex/shared/validators/api/coach';
 
-import { BlockGeneratorForm } from '@/components/coach/BlockGeneratorForm';
-import { type ExerciseOption, PlanEditor } from '@/components/coach/PlanEditor';
-import { ProgramTypeCards } from '@/components/coach/ProgramTypeCards';
+import {
+  BlockParamsForm,
+  type BlockParamsValue,
+} from '@/components/coach/BlockParamsForm';
+import { Week1TemplateBuilder } from '@/components/coach/Week1TemplateBuilder';
+import type { DayDraft, ExerciseOption } from '@/components/coach/types';
 import { Button } from '@/components/ui/button';
 
 import { Route as RootRoute } from './__root.tsx';
 
-interface PreviewResponse {
-  plan: LlmCoachOutput;
-  model: string;
-  prompt_version: number;
-}
-
 interface SaveResponse {
   block_id: number;
   sets_inserted: number;
-  unknown_exercises: string[];
+  end_date: string;
 }
 
-async function postJson<T>(url: string, body: unknown): Promise<T> {
-  const r = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!r.ok) {
-    const text = await r.text().catch(() => '');
-    throw new Error(`${r.status}: ${text.slice(0, 200)}`);
-  }
-  return r.json() as Promise<T>;
-}
+const DEFAULT_PARAMS: BlockParamsValue = {
+  weeks: 4,
+  selectedDays: ['mon', 'wed', 'fri'],
+  startDate: '',
+  squat1rmKg: 0,
+  bench1rmKg: 0,
+  deadlift1rmKg: 0,
+  deadliftStance: 'conventional',
+  notes: '',
+};
 
 function CoachPage() {
-  const [programType, setProgramType] = useState<ProgramType | null>(null);
-  const [input, setInput] = useState<GenerateBlockInput | null>(null);
-  const [plan, setPlan] = useState<LlmCoachOutput | null>(null);
-  const [savedBlockId, setSavedBlockId] = useState<number | null>(null);
-  const [unknownExercises, setUnknownExercises] = useState<string[]>([]);
+  const navigate = useNavigate();
+  const [params, setParams] = useState<BlockParamsValue>(DEFAULT_PARAMS);
+  const [step, setStep] = useState<1 | 2>(1);
+  const [week1, setWeek1] = useState<DayDraft[]>([]);
 
   const exercisesQ = useQuery({
     queryKey: ['exercises'],
@@ -54,123 +46,119 @@ function CoachPage() {
     },
   });
 
-  const previewMut = useMutation({
-    mutationFn: (i: GenerateBlockInput) => postJson<PreviewResponse>('/api/coach/preview', i),
-    onSuccess: (res, vars) => {
-      setInput(vars);
-      setPlan(res.plan);
-      setSavedBlockId(null);
-      setUnknownExercises([]);
-    },
-  });
+  const exercises = exercisesQ.data?.exercises ?? [];
 
   const saveMut = useMutation({
-    mutationFn: (body: { input: GenerateBlockInput; plan: LlmCoachOutput }) =>
-      postJson<SaveResponse>('/api/coach/blocks', body),
+    mutationFn: async (body: CreateBlockInput) => {
+      const r = await fetch('/api/coach/blocks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) {
+        const text = await r.text().catch(() => '');
+        throw new Error(`${r.status}: ${text.slice(0, 200)}`);
+      }
+      return r.json() as Promise<SaveResponse>;
+    },
     onSuccess: (res) => {
-      setSavedBlockId(res.block_id);
-      setUnknownExercises(res.unknown_exercises);
+      navigate({ to: '/coach/blocks/$id', params: { id: String(res.block_id) } });
     },
   });
 
-  const reset = () => {
-    setProgramType(null);
-    setInput(null);
-    setPlan(null);
-    setSavedBlockId(null);
-    setUnknownExercises([]);
-    previewMut.reset();
-    saveMut.reset();
+  const goToStep2 = () => {
+    const next: DayDraft[] = params.selectedDays.map((_, i) => ({
+      dayNo: i + 1,
+      exercises: [],
+    }));
+    setWeek1(next);
+    setStep(2);
+  };
+
+  const canSave = useMemo(() => {
+    if (week1.length !== params.selectedDays.length) return false;
+    return week1.every((d) => d.exercises.length > 0 && d.exercises.every((e) => e.sets.length > 0));
+  }, [week1, params.selectedDays.length]);
+
+  const handleSave = () => {
+    const body: CreateBlockInput = {
+      weeks: params.weeks,
+      daysPerWeek: params.selectedDays.length,
+      selectedDays: params.selectedDays,
+      startDate: params.startDate,
+      squat1rmKg: params.squat1rmKg,
+      bench1rmKg: params.bench1rmKg,
+      deadlift1rmKg: params.deadlift1rmKg,
+      deadliftStance: params.deadliftStance,
+      notes: params.notes.trim() ? params.notes.trim() : null,
+      week1,
+    };
+    saveMut.mutate(body);
   };
 
   return (
-    <main className="mx-auto max-w-5xl space-y-8 p-6">
+    <main className="mx-auto max-w-6xl space-y-6 p-6">
       <header className="flex items-baseline justify-between">
         <div>
           <h1 className="text-2xl font-semibold">코치 모드</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            프로그램 타입을 고르고 입력 → Gemini 가 제안 → 카드에서 자유롭게 편집 → 저장.
+          <p className="mt-1 text-sm text-muted-foreground">
+            기간/요일/1RM 입력 → 주 1 템플릿 빌드 → 저장 시 N 주 자동 복제.
           </p>
         </div>
-        <Link to="/" className="text-sm text-slate-500 underline">
+        <Link to="/" className="text-sm text-muted-foreground underline">
           ← 홈
         </Link>
       </header>
 
-      <Section title="1. 프로그램 타입">
-        <ProgramTypeCards selected={programType} onSelect={setProgramType} />
-      </Section>
+      <ol className="flex items-center gap-2 text-sm">
+        <li className={step === 1 ? 'font-semibold' : 'text-muted-foreground'}>1. 블럭 파라미터</li>
+        <li className="text-muted-foreground">→</li>
+        <li className={step === 2 ? 'font-semibold' : 'text-muted-foreground'}>
+          2. 주 1 템플릿
+        </li>
+      </ol>
 
-      {programType && (
-        <Section title="2. 입력">
-          <BlockGeneratorForm
-            programType={programType}
-            loading={previewMut.isPending}
-            onGenerate={(i) => previewMut.mutate(i)}
-          />
-          {previewMut.isError && (
-            <ErrorBox message={`제안 생성 실패: ${(previewMut.error as Error).message}`} />
-          )}
-        </Section>
+      {step === 1 && (
+        <section className="space-y-3">
+          <BlockParamsForm value={params} onChange={setParams} onNext={goToStep2} />
+        </section>
       )}
 
-      {plan && input && (
-        <Section title="3. 카드 편집">
-          <p className="text-sm text-slate-600">
-            제안된 plan 을 기초로 자유롭게 수정. 세트/운동 추가·삭제, 무게/반복/RPE 조정 가능.
-          </p>
-          <PlanEditor plan={plan} exercises={exercisesQ.data?.exercises ?? []} onChange={setPlan} />
-          <div className="flex items-center gap-2">
-            <Button onClick={() => saveMut.mutate({ input, plan })} disabled={saveMut.isPending}>
-              {saveMut.isPending ? '저장 중…' : '이 블럭 저장 (활성화)'}
-            </Button>
-            <Button variant="outline" onClick={reset}>
-              처음부터 다시
-            </Button>
-          </div>
-          {saveMut.isError && (
-            <ErrorBox message={`저장 실패: ${(saveMut.error as Error).message}`} />
+      {step === 2 && (
+        <section className="space-y-4">
+          {exercisesQ.isLoading && (
+            <p className="text-sm text-muted-foreground">운동 카탈로그 로딩 중…</p>
           )}
-        </Section>
-      )}
-
-      {savedBlockId !== null && (
-        <Section title="4. 저장 완료">
-          <div className="rounded-md bg-green-50 p-4 text-sm">
-            <p className="font-medium text-green-900">
-              블럭 #{savedBlockId} 저장됨. 활성 블럭으로 전환되었습니다.
+          {exercisesQ.isError && (
+            <p className="text-sm text-destructive">
+              운동 카탈로그 로드 실패: {(exercisesQ.error as Error).message}
             </p>
-            {unknownExercises.length > 0 && (
-              <div className="mt-2 text-amber-800">
-                <p className="font-medium">카탈로그에 없는 운동 (저장 누락):</p>
-                <ul className="mt-1 list-disc pl-5">
-                  {unknownExercises.map((n) => (
-                    <li key={n}>{n}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
+          )}
+          <Week1TemplateBuilder
+            selectedDays={params.selectedDays}
+            week1={week1}
+            exercises={exercises}
+            onChange={setWeek1}
+          />
+
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Button variant="ghost" onClick={() => setStep(1)}>
+              ← 파라미터 수정
+            </Button>
+            <div className="flex items-center gap-2">
+              {saveMut.isError && (
+                <span className="text-xs text-destructive">
+                  저장 실패: {(saveMut.error as Error).message}
+                </span>
+              )}
+              <Button onClick={handleSave} disabled={!canSave || saveMut.isPending}>
+                {saveMut.isPending ? '저장 중…' : `저장 (${params.weeks}주 복제)`}
+              </Button>
+            </div>
           </div>
-        </Section>
+        </section>
       )}
     </main>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="space-y-3">
-      <h2 className="text-base font-medium text-slate-700">{title}</h2>
-      {children}
-    </section>
-  );
-}
-
-function ErrorBox({ message }: { message: string }) {
-  return (
-    <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900">
-      {message}
-    </div>
   );
 }
 
