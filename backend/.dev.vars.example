@@ -1,4 +1,9 @@
 # Runtime secrets injected into the Worker during `wrangler dev`.
 # Copy to .dev.vars and fill in. Wrangler auto-reads .dev.vars (do NOT rename).
 #
-# Phase 2 (수동 코치 모드) 에는 외부 API 키 없음. 비워두거나 파일 자체를 두지 않아도 됨.
+# Phase 4 (멀티유저): 가입 초대 코드. 같은 값을 prod 에도 `wrangler secret put INVITE_CODE` 로 등록한다.
+INVITE_CODE=replace-with-strong-random-string
+
+# 로컬 개발용 fallback 이메일. wrangler dev 에는 Cf-Access 헤더가 없으므로 설정해 두면 그 이메일로 인증된 셈 친다.
+# prod 에서는 무시된다 (Cf-Access 헤더가 진실의 원천).
+DEV_USER_EMAIL=you@example.com

@@ -20,11 +20,18 @@ const timestamps = {
 
 // ---------- users ----------
 
-export const users = sqliteTable('users', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  email: text('email'),
-  ...timestamps,
-});
+export const users = sqliteTable(
+  'users',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    // Cf-Access-Authenticated-User-Email 헤더로 매핑. 가입 시점에 채워짐. 중복 불가.
+    email: text('email').notNull(),
+    ...timestamps,
+  },
+  (table) => ({
+    emailUnique: uniqueIndex('users_email_unique').on(table.email),
+  }),
+);
 
 // ---------- settings (per-user, single row in single-user mode) ----------
 

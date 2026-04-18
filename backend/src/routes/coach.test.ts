@@ -33,20 +33,31 @@ const VALID_BLOCK_INPUT = {
   ],
 };
 
+// requireUser 단락용 — DB binding 없이 userId 1 로 통과시킨다.
+const TEST_ENV = { DEV_USER_EMAIL: 'test@example.com', DEV_USER_ID: 1 };
+
 function postCoach(path: string, body: unknown) {
-  return app.request(`/api/coach${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  return app.request(
+    `/api/coach${path}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+    TEST_ENV,
+  );
 }
 
 function patchCoach(path: string, body: unknown) {
-  return app.request(`/api/coach${path}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  return app.request(
+    `/api/coach${path}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+    TEST_ENV,
+  );
 }
 
 describe('createBlockInputSchema (zod)', () => {
@@ -151,7 +162,7 @@ describe('PATCH /api/coach/blocks/:id/week/:weekNo', () => {
 
 describe('GET /api/coach/blocks/:id', () => {
   it('잘못된 id 는 400', async () => {
-    const res = await app.request('/api/coach/blocks/abc');
+    const res = await app.request('/api/coach/blocks/abc', undefined, TEST_ENV);
     expect(res.status).toBe(400);
   });
 });

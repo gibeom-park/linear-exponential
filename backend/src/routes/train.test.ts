@@ -12,6 +12,9 @@ import {
 import app from '../index.ts';
 import { nearbyPlannedDates, resolveSession } from './train.ts';
 
+// requireUser 단락용 — DB binding 없이 userId 1 로 통과시킨다.
+const TEST_ENV = { DEV_USER_EMAIL: 'test@example.com', DEV_USER_ID: 1 };
+
 const BLOCK = {
   // 2026-04-20 (Mon), 6주, 주 3 (월/수/금) → end_date = 2026-05-31
   startDate: '2026-04-20',
@@ -231,41 +234,49 @@ describe('sessionLogInputSchema', () => {
 
 describe('GET /api/train/day', () => {
   it('date 파라미터 없으면 400', async () => {
-    const res = await app.request('/api/train/day');
+    const res = await app.request('/api/train/day', undefined, TEST_ENV);
     expect(res.status).toBe(400);
   });
 
   it('잘못된 date 포맷은 400', async () => {
-    const res = await app.request('/api/train/day?date=2026/04/20');
+    const res = await app.request('/api/train/day?date=2026/04/20', undefined, TEST_ENV);
     expect(res.status).toBe(400);
   });
 });
 
 describe('POST /api/train/checkin', () => {
   it('잘못된 입력은 400', async () => {
-    const res = await app.request('/api/train/checkin', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ conditionScore: 4 }), // date 누락
-    });
+    const res = await app.request(
+      '/api/train/checkin',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conditionScore: 4 }), // date 누락
+      },
+      TEST_ENV,
+    );
     expect(res.status).toBe(400);
   });
 });
 
 describe('POST /api/train/sets', () => {
   it('잘못된 입력은 400', async () => {
-    const res = await app.request('/api/train/sets', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ date: '2026-04-20', sets: [] }),
-    });
+    const res = await app.request(
+      '/api/train/sets',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: '2026-04-20', sets: [] }),
+      },
+      TEST_ENV,
+    );
     expect(res.status).toBe(400);
   });
 });
 
 describe('GET /api/train/checkin', () => {
   it('date 파라미터 없으면 400', async () => {
-    const res = await app.request('/api/train/checkin');
+    const res = await app.request('/api/train/checkin', undefined, TEST_ENV);
     expect(res.status).toBe(400);
   });
 });

@@ -15,6 +15,13 @@
       "when": 1808900000000,
       "tag": "0001_manual_coach",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1776497549639,
+      "tag": "0002_user_email_unique",
+      "breakpoints": true
     }
   ]
 }

@@ -2,7 +2,7 @@
 
 `total_plan.md` 의 인프라/데이터 결정사항을 모은 문서. 도메인 결정은 [`domain_model.md`](./domain_model.md), 보강 트래커는 [`total_plan_suggestions.md`](./total_plan_suggestions.md).
 
-마지막 갱신: 2026-04-18 — B 섹션 1차 결정 + 프론트/백/공통 도구 스택 결정 + 배포 토폴로지를 Single Worker (Static Assets) 로 정정. **추가**: Phase 2 가 수동 빌더로 재구성되며 Gemini 키 관리 / `@google/generative-ai` 의존 / `gemini.ts` 항목은 Post-MVP 로 이동.
+마지막 갱신: 2026-04-18 — B 섹션 1차 결정 + 프론트/백/공통 도구 스택 결정 + 배포 토폴로지를 Single Worker (Static Assets) 로 정정. **추가**: Phase 2 가 수동 빌더로 재구성되며 Gemini 키 관리 / `@google/generative-ai` 의존 / `gemini.ts` 항목은 Post-MVP 로 이동. **Phase 4 (멀티유저 전환)**: §1 의 "단일 유저 가정" 폐기 → Cf-Access 이메일 + 초대 코드 (`INVITE_CODE` Worker secret) 게이트로 가입 → `users` 행 생성 → 모든 라우트가 `requireUser` 미들웨어를 통해 `c.get('userId')` 사용. 자세한 결정은 [`roadmap.md`](./roadmap.md) Phase 4 섹션 참고.
 
 ---
 
