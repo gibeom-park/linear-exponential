@@ -4,10 +4,7 @@ import { useMemo, useState } from 'react';
 
 import type { CreateBlockInput } from '@linex/shared/validators/api/coach';
 
-import {
-  BlockParamsForm,
-  type BlockParamsValue,
-} from '@/components/coach/BlockParamsForm';
+import { BlockParamsForm, type BlockParamsValue } from '@/components/coach/BlockParamsForm';
 import { Week1TemplateBuilder } from '@/components/coach/Week1TemplateBuilder';
 import type { DayDraft, ExerciseOption } from '@/components/coach/types';
 import { Button } from '@/components/ui/button';
@@ -77,7 +74,9 @@ function CoachPage() {
 
   const canSave = useMemo(() => {
     if (week1.length !== params.selectedDays.length) return false;
-    return week1.every((d) => d.exercises.length > 0 && d.exercises.every((e) => e.sets.length > 0));
+    return week1.every(
+      (d) => d.exercises.length > 0 && d.exercises.every((e) => e.sets.length > 0),
+    );
   }, [week1, params.selectedDays.length]);
 
   const handleSave = () => {
@@ -113,9 +112,7 @@ function CoachPage() {
       <ol className="flex items-center gap-2 text-sm">
         <li className={step === 1 ? 'font-semibold' : 'text-muted-foreground'}>1. 블럭 파라미터</li>
         <li className="text-muted-foreground">→</li>
-        <li className={step === 2 ? 'font-semibold' : 'text-muted-foreground'}>
-          2. 주 1 템플릿
-        </li>
+        <li className={step === 2 ? 'font-semibold' : 'text-muted-foreground'}>2. 주 1 템플릿</li>
       </ol>
 
       {step === 1 && (

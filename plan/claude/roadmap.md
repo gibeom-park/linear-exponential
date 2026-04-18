@@ -22,7 +22,7 @@
 
 ## Phase 1 — 인프라 & DB 셋업
 
-**상태: 🚧 거의 완료 — 사용자 수동 단계 2건 남음 (Access 등록, CI 1회 green push)**
+**상태: 🚧 거의 완료 — 사용자 수동 단계 1건 남음 (Cloudflare Access 본인 이메일 등록)**
 
 ### Done definition (모두 ✓ 가 되면 종료)
 - [x] pnpm workspace 초기화: `frontend/`, `backend/`, `shared/` 3패키지 + 루트 설정
@@ -37,7 +37,7 @@
 - [ ] Cloudflare Access 본인 이메일 등록 — 절차는 `README.md` 에 문서화, **사용자 대시보드 작업 필요**
 - [x] Hono 앱 + `GET /api/health` (200 OK + 단위 테스트 통과)
 - [x] Biome 루트 설정 → 전 패키지 lint 통과
-- [ ] GitHub Actions CI 워크플로우 — `.github/workflows/ci.yml` 작성, **첫 push 시 green 확인 필요**
+- [x] GitHub Actions CI 워크플로우 (`.github/workflows/ci.yml`): lint → typecheck → test → frontend build, PR / main push 트리거
 - [x] `pnpm dev` 한 줄로 frontend + backend 동시 실행 (스모크 테스트 통과)
 
 ### Verification
@@ -59,7 +59,7 @@ pnpm dev
 
 ## Phase 2 — 코치 모드 MVP (수동 빌더)
 
-**상태: 🚧 진행 중 — 1차 (LLM 기반) 완료 후 수동 빌더로 재구성**
+**상태: ✅ 완료 (2026-04-18) — 수동 빌더로 재구성, 로컬 E2E 시연 완료**
 
 > 1차안은 Gemini 기반 블럭 생성이었으나 (a) Workers KR PoP 의 Gemini geo-restriction, (b) 어차피 LLM 결과를 수정하는 사용 패턴, (c) "코치가 직접 짠다" 는 본래 의도와의 정합성을 이유로 **수동 빌더** 로 전환. AI 통합은 Post-MVP 로 이동.
 
@@ -77,7 +77,7 @@ pnpm dev
 - [x] 프론트 `/coach/blocks/:id`: 주별 편집 화면 (주 선택 탭 + Step 2 동일 UI + 주 단위 PATCH)
 - [x] LLM 관련 코드 제거: `backend/src/lib/gemini.ts`, `backend/prompts/`, `backend/scripts/build-prompts.mjs`, `shared/src/validators/llm/`, `GEMINI_*` env / scripts
 - [x] `prompts_model.md` → `archive/prompts_model.md` 로 이동 (AI 재도입 시 참고)
-- [ ] 로컬 E2E 시연 (시작일 → 자동 종료일, 6주 복제 적재, 주 3 무게만 수정 후 유지 확인)
+- [x] 로컬 E2E 시연 (시작일 → 자동 종료일, 6주 복제 적재, 주 3 무게만 수정 후 유지 확인)
 
 ### Verification
 - 단위: `pnpm --filter backend test` (입력 검증 / 활성 토글 / sets 청크 / patch week / 404·400)

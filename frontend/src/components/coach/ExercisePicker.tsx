@@ -64,14 +64,12 @@ export function ExercisePicker({
     if (kind === 'variation') {
       if (!parentLift) return [];
       return exercises.filter(
-        (e) =>
-          e.kind === 'variation' && e.parentLift === parentLift && !exclude.has(e.id),
+        (e) => e.kind === 'variation' && e.parentLift === parentLift && !exclude.has(e.id),
       );
     }
     if (!muscleGroup) return [];
     return exercises.filter(
-      (e) =>
-        e.kind === 'accessory' && e.muscleGroup === muscleGroup && !exclude.has(e.id),
+      (e) => e.kind === 'accessory' && e.muscleGroup === muscleGroup && !exclude.has(e.id),
     );
   }, [exercises, kind, parentLift, muscleGroup, exclude]);
 
@@ -121,13 +119,11 @@ export function ExercisePicker({
                 <SelectValue placeholder="부모 종목" />
               </SelectTrigger>
               <SelectContent>
-                {(Object.keys(PARENT_LIFT_LABEL) as Array<Exclude<ParentLift, 'none'>>).map(
-                  (p) => (
-                    <SelectItem key={p} value={p}>
-                      {PARENT_LIFT_LABEL[p]}
-                    </SelectItem>
-                  ),
-                )}
+                {(Object.keys(PARENT_LIFT_LABEL) as Array<Exclude<ParentLift, 'none'>>).map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {PARENT_LIFT_LABEL[p]}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -158,24 +154,27 @@ export function ExercisePicker({
           </div>
         )}
 
-        {kind && (kind === 'main' || (kind === 'variation' && parentLift) || (kind === 'accessory' && muscleGroup)) && (
-          <div className="md:col-span-1">
-            <Select value={exerciseId} onValueChange={setExerciseId}>
-              <SelectTrigger className="w-full">
-                <SelectValue
-                  placeholder={filtered.length === 0 ? '선택 가능한 운동 없음' : '운동 선택'}
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {filtered.map((e) => (
-                  <SelectItem key={e.id} value={String(e.id)}>
-                    {e.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
+        {kind &&
+          (kind === 'main' ||
+            (kind === 'variation' && parentLift) ||
+            (kind === 'accessory' && muscleGroup)) && (
+            <div className="md:col-span-1">
+              <Select value={exerciseId} onValueChange={setExerciseId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue
+                    placeholder={filtered.length === 0 ? '선택 가능한 운동 없음' : '운동 선택'}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {filtered.map((e) => (
+                    <SelectItem key={e.id} value={String(e.id)}>
+                      {e.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
       </div>
 
       <div className="flex items-center gap-2">

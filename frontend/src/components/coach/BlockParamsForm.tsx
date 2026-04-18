@@ -59,12 +59,9 @@ function toIsoDate(date: Date): string {
 }
 
 function fromIsoDate(iso: string): Date | undefined {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return undefined;
-  const parts = iso.split('-').map(Number);
-  const y = parts[0]!;
-  const m = parts[1]!;
-  const d = parts[2]!;
-  return new Date(y, m - 1, d);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return undefined;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
 }
 
 function computeEndDate(startIso: string, weeks: number): string | null {
@@ -124,14 +121,18 @@ export function BlockParamsForm({ value, onChange, onNext }: BlockParamsFormProp
           <div className="flex flex-wrap gap-3 rounded-md border bg-card px-3 py-2">
             {DAY_OF_WEEK.map((d) => {
               const checked = value.selectedDays.includes(d);
+              const id = `day-${d}`;
               return (
-                <label key={d} className="flex items-center gap-1.5 text-sm">
+                <div key={d} className="flex items-center gap-1.5 text-sm">
                   <Checkbox
+                    id={id}
                     checked={checked}
                     onCheckedChange={(v) => toggleDay(d, v === true)}
                   />
-                  <span>{DAY_LABEL_KO[d]}</span>
-                </label>
+                  <Label htmlFor={id} className="font-normal">
+                    {DAY_LABEL_KO[d]}
+                  </Label>
+                </div>
               );
             })}
           </div>
