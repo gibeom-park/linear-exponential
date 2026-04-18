@@ -10,9 +10,15 @@ coverage/
 frontend/dist/
 *.tsbuildinfo
 
+# Codegen (backend prompts bundled to .ts)
+backend/prompts/generated.ts
+
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars
+
+# MCP browser session artifacts
+.playwright-mcp/
 
 # Environment / secrets
 .env

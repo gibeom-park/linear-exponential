@@ -4,6 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "prompts:generate": "node scripts/build-prompts.mjs",
+    "predev": "node scripts/build-prompts.mjs",
+    "pretest": "node scripts/build-prompts.mjs",
+    "pretypecheck": "node scripts/build-prompts.mjs",
+    "predeploy": "node scripts/build-prompts.mjs",
     "dev": "wrangler dev",
     "deploy": "dotenv -e ../.env -- wrangler deploy",
     "typecheck": "tsc --noEmit",
