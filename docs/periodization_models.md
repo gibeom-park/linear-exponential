@@ -1,12 +1,8 @@
 # 주기화 프로그램 (Periodization Models)
 
-코치 모드에서 사용자가 선택할 수 있는 4종 주기화 프로그램의 정의/특성/적합 대상.
+4종 주기화 프로그램의 정의/특성/적합 대상. **사용자 학습 자료**.
 
-- **참조 위치**: [`plan/claude/domain_model.md`](../plan/claude/domain_model.md) §2
-- **default 프로그램**: Linear
-- **프롬프트 매핑**: 각 프로그램은 `backend/prompts/coach_{program_type}.md` 와 1:1 대응
-
-각 프로그램의 **UI 카드 한 줄 설명** 은 코치 모드 진입 시 카드 컴포넌트에서 그대로 사용한다.
+> Phase 2 (수동 코치 모드) 에서는 프로그램 타입 카탈로그를 사용하지 않음 — 사용자가 직접 주기화를 설계. AI 도입 (Post-MVP) 검토 시 프롬프트 분기를 부활시킬지와 함께 다시 결정. ([`plan/claude/domain_model.md`](../plan/claude/domain_model.md) §2)
 
 ---
 

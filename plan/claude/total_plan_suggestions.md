@@ -44,7 +44,7 @@
 
 ### B2. 인증 전략 — DECIDED
 - Cloudflare Access (Zero Trust, 무료 플랜)
-- Gemini API 키: Workers Secrets, 프론트 노출 금지
+- LLM API 키 관리는 AI 도입 시점 (Post-MVP) 에 재결정. 1차안 (Workers Secrets + 프론트 비노출) 은 [`archive/prompts_model.md`](./archive/prompts_model.md) 참고.
 
 ### B3. 마이그레이션 / ORM 도구 — DECIDED
 - Drizzle ORM + Drizzle Kit (D1 first-class)
