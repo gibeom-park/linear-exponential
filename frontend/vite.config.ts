@@ -11,6 +11,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      includeAssets: ['icon.svg'],
       manifest: {
         name: 'Linear Exponential',
         short_name: 'LinEx',
@@ -18,8 +19,22 @@ export default defineConfig({
         theme_color: '#0f172a',
         background_color: '#0f172a',
         display: 'standalone',
+        orientation: 'portrait',
         start_url: '/',
-        icons: [],
+        icons: [
+          {
+            src: 'icon.svg',
+            sizes: '192x192 512x512',
+            type: 'image/svg+xml',
+            purpose: 'any',
+          },
+          {
+            src: 'icon.svg',
+            sizes: '192x192 512x512',
+            type: 'image/svg+xml',
+            purpose: 'maskable',
+          },
+        ],
       },
       workbox: {
         // 앱 셸: cache-first / API: network-first / 카탈로그: SWR (infra_model.md §4)
