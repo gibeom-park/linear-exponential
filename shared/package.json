@@ -10,7 +10,8 @@
     "./schema": "./src/schema.ts",
     "./enums": "./src/enums.ts",
     "./validators": "./src/validators/index.ts",
-    "./validators/llm/*": "./src/validators/llm/*.ts"
+    "./validators/llm/*": "./src/validators/llm/*.ts",
+    "./validators/api/*": "./src/validators/api/*.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

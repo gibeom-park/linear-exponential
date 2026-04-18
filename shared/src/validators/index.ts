@@ -55,12 +55,5 @@ export const checkinInputSchema = z.object({
   notes: z.string().max(500).optional(),
 });
 
-export const generateBlockInputSchema = z.object({
-  programType: z.enum(['linear', 'dup', 'block', 'conjugate']),
-  weeks: z.number().int().min(3).max(8),
-  daysPerWeek: z.number().int().min(1).max(7),
-  squat1rmKg: z.number().min(0),
-  bench1rmKg: z.number().min(0),
-  deadlift1rmKg: z.number().min(0),
-  weakPoints: z.string().max(500).optional(),
-});
+export * from './api/index.ts';
+export * from './llm/index.ts';

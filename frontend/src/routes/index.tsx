@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { createRoute } from '@tanstack/react-router';
+import { Link, createRoute } from '@tanstack/react-router';
 
 import { Route as RootRoute } from './__root.tsx';
 
@@ -18,8 +18,14 @@ function HomePage() {
   return (
     <main className="p-6">
       <h1 className="text-2xl font-semibold">Linear Exponential</h1>
-      <p className="mt-2 text-sm text-slate-600">Phase 1 scaffold. Backend health check below.</p>
-      <pre className="mt-4 rounded bg-slate-100 p-3 text-sm">
+      <p className="mt-2 text-sm text-slate-600">파워리프팅 프로그램 도구.</p>
+      <Link
+        to="/coach"
+        className="mt-4 inline-block rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white"
+      >
+        코치 모드 →
+      </Link>
+      <pre className="mt-6 rounded bg-slate-100 p-3 text-xs text-slate-500">
         {isLoading
           ? 'loading…'
           : error
