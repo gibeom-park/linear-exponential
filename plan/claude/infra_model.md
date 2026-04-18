@@ -68,7 +68,7 @@ linear-exponential/
       schema.ts             # Drizzle 테이블 정의 (frontend/backend 양쪽 import)
       types.ts              # 스키마에서 추론된 TS 타입
       validators.ts         # Zod 스키마 (drizzle-zod 로 자동 생성 가능)
-      enums.ts              # program_type, e1rm_formula 등 도메인 enum
+      enums.ts              # day_of_week, e1rm_formula 등 도메인 enum
 ```
 
 ### Drizzle 워크플로우
