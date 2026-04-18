@@ -20,7 +20,7 @@
     "db:migrate:remote": "pnpm --filter backend db:migrate:remote",
     "db:seed:local": "pnpm --filter backend db:seed:local",
     "db:seed:remote": "pnpm --filter backend db:seed:remote",
-    "deploy": "pnpm --filter frontend build && pnpm --filter backend deploy"
+    "deploy": "pnpm --filter frontend build && pnpm --filter backend run deploy"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
